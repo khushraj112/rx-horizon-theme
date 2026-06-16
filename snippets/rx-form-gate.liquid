@@ -70,7 +70,7 @@
   {%- else -%}
     <style>[id*='__forms_inline']{display:none!important}</style>
     <div style="margin:2rem 0;padding:1.5rem;background:#f5f5f5;border:1px solid #ddd;border-radius:8px;">
-      <p style="margin:0;">Please <a href="/account/login?return_url=/pages/rx-apply">log in</a> to apply for Rx access.</p>
+      <p style="margin:0;">Please <a href="{{ routes.account_login_url }}?return_url=/pages/rx-apply">log in</a> to apply for Rx access.</p>
     </div>
   {%- endif -%}
 
@@ -133,7 +133,7 @@
   {%- else -%}
     <style>[id*='__forms_inline']{display:none!important}</style>
     <div style="margin:2rem 0;padding:1.5rem;background:#f5f5f5;border:1px solid #ddd;border-radius:8px;">
-      <p style="margin:0;">Please <a href="/account/login?return_url=/pages/rx-manual-review">log in</a> to continue.</p>
+      <p style="margin:0;">Please <a href="{{ routes.account_login_url }}?return_url=/pages/rx-manual-review">log in</a> to continue.</p>
     </div>
   {%- endif -%}
 {%- endif -%}
