@@ -1,0 +1,481 @@
+{% comment %}
+  This file is managed by the Talon Customer Flows app. It can change at any time.
+{% endcomment %}
+{% capture line_break %}
+{% endcapture %}
+{% liquid
+  assign lock_metafield_namespace = 'talon-approval'
+  assign configured_app_proxy_base_path = '/apps/talon-approval'
+  assign app_proxy_base_path = configured_app_proxy_base_path
+
+  assign app_proxy_path_metafield = shop.metafields[lock_metafield_namespace].customer_form_proxy_path
+  assign observed_app_proxy_base_path = ''
+  if app_proxy_path_metafield and app_proxy_path_metafield.value.path
+    assign observed_app_proxy_base_path = app_proxy_path_metafield.value.path | strip
+  endif
+
+  assign first_two_proxy_path_characters = observed_app_proxy_base_path | slice: 0, 2
+  if observed_app_proxy_base_path != ''
+    if observed_app_proxy_base_path contains '://'
+      assign observed_app_proxy_base_path = ''
+    elsif first_two_proxy_path_characters == '//'
+      assign observed_app_proxy_base_path = ''
+    endif
+  endif
+  if observed_app_proxy_base_path != ''
+    assign first_proxy_path_character = observed_app_proxy_base_path | slice: 0, 1
+    if first_proxy_path_character != '/'
+      assign observed_app_proxy_base_path = '/' | append: observed_app_proxy_base_path
+    endif
+    if observed_app_proxy_base_path != '/'
+      assign app_proxy_base_path = observed_app_proxy_base_path
+    endif
+  endif
+  assign app_proxy_base_path_last_character = app_proxy_base_path | slice: -1
+  if app_proxy_base_path_last_character == '/' and app_proxy_base_path != '/'
+    assign app_proxy_base_path_trimmed_size = app_proxy_base_path | size | minus: 1
+    assign app_proxy_base_path = app_proxy_base_path | slice: 0, app_proxy_base_path_trimmed_size
+  endif
+
+  assign in_preview = false
+  if request.design_mode
+    assign in_preview = true
+  elsif request.visual_preview_mode
+    assign in_preview = true
+  endif
+
+  if in_preview
+    echo '<!-- NOT Locking due to preview mode -->'
+  else
+    assign starts_with_allow = '/account|/customer_authentication|/reset-password|/customer-account-password-reset|/challenge|/tools/emails|/password|' | append: app_proxy_base_path
+    assign starts_with_array = starts_with_allow | split: '|'
+    assign normalized_request_path = request.path
+    assign locale_path_segment = request.locale.root_url | default: ''
+    if locale_path_segment == ''
+      assign request_locale_code = request.locale.iso_code | default: '' | downcase
+      if request_locale_code != ''
+        assign locale_path_segment = '/' | append: request_locale_code
+      endif
+    endif
+    if locale_path_segment != '' and locale_path_segment != '/'
+      assign locale_path_prefix = locale_path_segment | append: '/'
+      assign locale_path_prefix_length = locale_path_prefix | size
+      assign request_locale_slice = request.path | slice: 0, locale_path_prefix_length
+      if request.path == locale_path_segment or request_locale_slice == locale_path_prefix
+        assign normalized_request_path = request.path | remove_first: locale_path_segment
+        if normalized_request_path == ''
+          assign normalized_request_path = '/'
+        endif
+      endif
+    endif
+
+    assign always_allow = false
+    for url in starts_with_array
+      assign url_length = url | size
+      assign sliced_request = request.path | slice: 0, url_length
+      assign sliced_normalized_request = normalized_request_path | slice: 0, url_length
+      if sliced_request == url or sliced_normalized_request == url
+        assign always_allow = true
+      endif
+    endfor
+
+    assign enabled_meta = shop.metafields[lock_metafield_namespace].enabled
+    assign is_enabled = false
+    if enabled_meta
+      assign enabled_val = enabled_meta.value
+      if enabled_val.enabled == true
+        assign is_enabled = true
+      endif
+    endif
+
+    assign locks_meta = shop.metafields[lock_metafield_namespace].lock_settings
+    assign locks = null
+    assign approval_product_filters = null
+    assign debug = false
+    if locks_meta
+      assign lock_settings = locks_meta.value
+      assign locks = lock_settings.locks
+      assign approval_product_filters = lock_settings.approval_product_filters
+      if lock_settings.debug
+        assign debug = lock_settings.debug
+      endif
+      if locks == null or locks.size == 0
+        assign locks = null
+        if approval_product_filters == null or approval_product_filters.size == 0
+          echo '<!-- NOT Locking due to empty lock_settings.locks metafield -->'
+        endif
+      endif
+      if approval_product_filters == null or approval_product_filters.size == 0
+        assign approval_product_filters = null
+      endif
+    else
+      echo '<!-- NOT Locking due to missing lock_settings metafield -->'
+    endif
+
+    if debug
+      echo '<!-- [debug info] ' | append: line_break
+      echo 'always_allow: ' | append: always_allow | append: ' | ' | append: line_break
+      echo 'has_locks: ' | append: locks | append: ' | ' | append: line_break
+      echo 'approval_product_filters: ' | append: approval_product_filters | append: ' | ' | append: line_break
+    endif
+
+    assign page_locked = false
+    assign redirect_flow_key = ''
+    assign customer_tags_array = null
+
+    if customer and customer.tags
+      assign customer_tags_array = customer.tags
+    endif
+
+    if is_enabled and always_allow == false and approval_product_filters
+      for approval_config in approval_product_filters
+        assign flow_identifier = 'flow_' | append: approval_config.flow_type
+        assign approval_denies = false
+        assign approval_customer_approved = false
+        assign approval_customer_pending = false
+
+        if customer_tags_array and approval_config.unlocked_stages
+          assign stage_tag_prefix = approval_config.flow_type | append: ':'
+          assign prefix_length = stage_tag_prefix | size
+          for raw_tag in customer_tags_array
+            assign trimmed_tag = raw_tag | strip
+            assign prefix_slice = trimmed_tag | slice: 0, prefix_length
+            if prefix_slice == stage_tag_prefix
+              assign current_stage = trimmed_tag | remove_first: stage_tag_prefix | strip
+              comment
+                pending is the canonical stage of a customer who has already
+                submitted the registration form but is awaiting a decision.
+                Track it so these customers can keep browsing instead of being
+                bounced to the form on every page. Stage ids are configurable
+                and pending is the Advanced Registration default.
+              endcomment
+              if current_stage == 'pending'
+                assign approval_customer_pending = true
+              endif
+              for stage in approval_config.unlocked_stages
+                if current_stage == stage
+                  assign approval_customer_approved = true
+                  break
+                endif
+              endfor
+              if approval_customer_approved
+                break
+              endif
+            endif
+          endfor
+        endif
+
+        if approval_config.enabled == true and approval_customer_approved == false
+          assign approval_rule_applies = false
+          if approval_config.applies_to == 'all_products'
+            comment
+              Redirect only signed-in customers who have NOT yet applied, so the
+              option still guides them to the form. A pending customer who has
+              already submitted is left to browse, and the checkout-validation
+              function still gates their purchase via unlocked_stages. Separate
+              theme locks below still apply to pending customers.
+            endcomment
+            if customer and approval_config.redirect_signed_in_unapproved_customers == true and approval_customer_pending == false
+              assign approval_rule_applies = true
+            endif
+          elsif product
+            if approval_config.mode == 'shop_lock' and approval_config.applies_to == 'matching_products' and approval_config.filters
+              for approval_filter in approval_config.filters
+                if approval_filter.type == 'product'
+                  assign configured_product_id = approval_filter.product_id | append: ''
+                  assign current_product_id = product.id | append: ''
+                  if configured_product_id == current_product_id
+                    assign approval_rule_applies = true
+                  endif
+                elsif approval_filter.type == 'product_tag' and product.tags
+                  for product_tag in product.tags
+                    if product_tag == approval_filter.tag
+                      assign approval_rule_applies = true
+                      break
+                    endif
+                  endfor
+                elsif approval_filter.type == 'vendor'
+                  if product.vendor == approval_filter.vendor
+                    assign approval_rule_applies = true
+                  endif
+                elsif approval_filter.type == 'collection' and product.collections
+                  for product_collection in product.collections
+                    assign configured_collection_id = approval_filter.collection_id | append: ''
+                    assign current_collection_id = product_collection.id | append: ''
+                    if configured_collection_id == current_collection_id
+                      assign approval_rule_applies = true
+                      break
+                    endif
+                  endfor
+                endif
+                if approval_rule_applies
+                  break
+                endif
+              endfor
+            endif
+          elsif collection and approval_config.mode == 'shop_lock' and approval_config.applies_to == 'matching_products' and approval_config.lock_collection_pages == true and approval_config.filters
+            for approval_filter in approval_config.filters
+              if approval_filter.type == 'collection'
+                assign configured_collection_id = approval_filter.collection_id | append: ''
+                assign current_collection_id = collection.id | append: ''
+                if configured_collection_id == current_collection_id
+                  assign approval_rule_applies = true
+                  break
+                endif
+              endif
+            endfor
+          endif
+
+          if approval_rule_applies
+            assign approval_denies = true
+          endif
+        endif
+
+        if debug
+          echo '<!-- [APPROVAL FILTER] ' | append: line_break
+          echo 'index: ' | append: forloop.index | append: ' | ' | append: line_break
+          echo 'flow_type: ' | append: approval_config.flow_type | append: ' | ' | append: line_break
+          echo 'enabled: ' | append: approval_config.enabled | append: ' | ' | append: line_break
+          echo 'applies_to: ' | append: approval_config.applies_to | append: ' | ' | append: line_break
+          echo 'lock_collection_pages: ' | append: approval_config.lock_collection_pages | append: ' | ' | append: line_break
+          echo 'approval_customer_approved: ' | append: approval_customer_approved | append: ' | ' | append: line_break
+          echo 'approval_customer_pending: ' | append: approval_customer_pending | append: ' | ' | append: line_break
+          echo 'approval_denies: ' | append: approval_denies | append: ' | ' | append: line_break
+          echo '-->' | append: line_break
+        endif
+
+        if approval_denies
+          assign page_locked = true
+          if redirect_flow_key == ''
+            assign redirect_flow_key = flow_identifier
+          endif
+          break
+        endif
+      endfor
+    endif
+
+    if page_locked == false and is_enabled and always_allow == false and locks
+      for lock in locks
+        assign flow_identifier = 'flow_' | append: lock.flow_type
+        assign matches_scope = false
+
+        assign product_match = false
+        if product
+          if lock.product_ids
+            for pid in lock.product_ids
+              assign pid_num = pid | plus: 0
+              assign product_id_num = product.id | plus: 0
+              if product_id_num == pid_num
+                assign product_match = true
+              endif
+            endfor
+          endif
+          if product_match == false and lock.collection_ids and product.collections
+            for col in product.collections
+              for cid in lock.collection_ids
+                assign cid_num = cid | plus: 0
+                assign col_id_num = col.id | plus: 0
+                if col_id_num == cid_num
+                  assign product_match = true
+                endif
+              endfor
+            endfor
+          endif
+        endif
+
+        assign collection_match = false
+        if collection and lock.collection_ids
+          for cid in lock.collection_ids
+            assign cid2_num = cid | plus: 0
+            assign collection_id_num = collection.id | plus: 0
+            if collection_id_num == cid2_num
+              assign collection_match = true
+            endif
+          endfor
+        endif
+
+        assign path_match = false
+        if lock.page_paths
+          for pattern in lock.page_paths
+            assign pattern = pattern | strip
+            unless pattern == ''
+              assign needs_leading = pattern | slice: 0, 1
+              if needs_leading != '/'
+                assign pattern = '/' | append: pattern
+              endif
+
+              assign last_char = pattern | slice: -1
+              assign prefix = pattern
+              assign check_len = request.path | size
+              if last_char == '*'
+                comment
+                  Compute prefix_len before slice: Liquid parses filter chains
+                  left-to-right, so `slice: 0, pattern | size | minus: 1` would
+                  pass `pattern` itself as slice's length arg.
+                endcomment
+                assign prefix_len = pattern | size | minus: 1
+                assign prefix = pattern | slice: 0, prefix_len
+                assign check_len = prefix_len
+              endif
+
+              assign req_slice = request.path | slice: 0, check_len
+              if req_slice == prefix
+                assign path_match = true
+              endif
+            endunless
+          endfor
+        endif
+
+        if product_match or collection_match or path_match
+          assign matches_scope = true
+        endif
+
+        assign lock_applies_to_page = false
+        if lock.lock_type == 'include_only'
+          assign lock_applies_to_page = matches_scope
+        elsif lock.lock_type == 'exclude_except'
+          if matches_scope
+            assign lock_applies_to_page = false
+          else
+            assign lock_applies_to_page = true
+          endif
+        elsif lock.lock_type == 'lock_all'
+          assign lock_applies_to_page = true
+        else
+          assign lock_applies_to_page = false
+        endif
+
+        if debug
+          echo '<!-- [LOCK PATH] ' | append: line_break
+          echo 'index: ' | append: forloop.index | append: ' | ' | append: line_break
+          echo 'flow_type: ' | append: lock.flow_type | append: ' | ' | append: line_break
+          echo 'lock_method: ' | append: lock.lock_method | append: ' | ' | append: line_break
+          echo 'lock_type: ' | append: lock.lock_type | append: ' | ' | append: line_break
+          echo 'product_match: ' | append: product_match | append: ' | ' | append: line_break
+          echo 'collection_match: ' | append: collection_match | append: ' | ' | append: line_break
+          echo 'path_match: ' | append: path_match | append: ' | ' | append: line_break
+          echo 'matches_scope: ' | append: matches_scope | append: ' | ' | append: line_break
+          echo 'lock_applies_to_page: ' | append: lock_applies_to_page | append: ' | ' | append: line_break
+          echo '-->' | append: line_break
+        endif
+
+        if lock_applies_to_page
+          assign lock_denies = true
+          if lock.lock_method == 'checkout' and customer == null
+            assign lock_denies = false
+          endif
+          if lock_denies and customer_tags_array and lock.unlocked_stages
+            assign stage_tag_prefix = lock.flow_type | append: ':'
+            assign prefix_length = stage_tag_prefix | size
+            if debug
+              echo '<!-- [LOCK TAGS PRE] ' | append: line_break
+              echo 'stage_tag_prefix: ' | append: stage_tag_prefix | append: ' | ' | append: line_break
+              echo 'lock.unlocked_stages: ' | append: lock.unlocked_stages | append: ' | ' | append: line_break
+              echo 'customer_tags_array: ' | append: customer_tags_array | append: ' | ' | append: line_break
+              echo '-->' | append: line_break
+            endif
+            for raw_tag in customer_tags_array
+              assign trimmed_tag = raw_tag | strip
+              assign prefix_slice = trimmed_tag | slice: 0, prefix_length
+              if prefix_slice == stage_tag_prefix
+                assign current_stage = trimmed_tag | remove_first: stage_tag_prefix | strip
+                if debug
+                  echo '<!-- [LOCK TAGS MATCH PREFIX] ' | append: line_break
+                  echo 'trimmed_tag: ' | append: trimmed_tag | append: ' | ' | append: line_break
+                  echo 'current_stage: ' | append: current_stage | append: ' | ' | append: line_break
+                  echo 'lock.unlocked_stages (iter): ' | append: lock.unlocked_stages | append: ' | ' | append: line_break
+                  echo '-->' | append: line_break
+                endif
+                for stage in lock.unlocked_stages
+                  if debug
+                    echo '<!-- [LOCK TAGS CHECK STAGE] ' | append: line_break
+                    echo 'current_stage: ' | append: current_stage | append: ' | ' | append: line_break
+                    echo 'stage: ' | append: stage | append: ' | ' | append: line_break
+                    echo '-->' | append: line_break
+                  endif
+                  if current_stage == stage
+                    assign lock_denies = false
+                    break
+                  endif
+                endfor
+                if lock_denies == false
+                  break
+                endif
+              elsif debug and lock_denies
+                echo '<!-- [LOCK TAGS SKIP] ' | append: line_break
+                echo 'trimmed_tag: ' | append: trimmed_tag | append: ' | ' | append: line_break
+                echo 'prefix_slice: ' | append: prefix_slice | append: ' | ' | append: line_break
+                echo '-->' | append: line_break
+              endif
+            endfor
+          endif
+          if debug
+            echo '<!-- [LOCK PATH] ' | append: line_break
+            echo 'index: ' | append: forloop.index | append: ' | ' | append: line_break
+            echo 'flow_type: ' | append: lock.flow_type | append: ' | ' | append: line_break
+            echo 'lock_denies: ' | append: lock_denies | append: ' | ' | append: line_break
+            if customer
+              echo 'customer.tags: ' | append: customer.tags | append: ' | ' | append: line_break
+            endif
+            echo '-->' | append: line_break
+          endif
+          if lock_denies
+            assign page_locked = true
+            if redirect_flow_key == ''
+              assign redirect_flow_key = flow_identifier
+            endif
+            break
+          endif
+        endif
+      endfor
+      comment
+        Once any applicable lock denies access, we break and don't evaluate remaining locks
+      endcomment
+    endif
+    if debug
+      echo '<!-- [LOCK SUMMARY] ' | append: line_break
+      echo 'page_locked: ' | append: page_locked | append: ' | ' | append: line_break
+      echo '-->' | append: line_break
+    endif
+
+    if page_locked
+      assign flow_redirect_path = app_proxy_base_path | append: '/'
+      assign redirect_return_to = request.path
+      if request.query_string and request.query_string != ''
+        assign redirect_return_to = redirect_return_to | append: '?' | append: request.query_string
+      endif
+      assign encoded_redirect_return_to = redirect_return_to | url_encode
+      assign redirect_url = flow_redirect_path | append: '?return_to=' | append: encoded_redirect_return_to
+      assign redirect_locale = request.locale.iso_code | default: ''
+      if redirect_locale != ''
+        assign encoded_redirect_locale = redirect_locale | url_encode
+        assign redirect_url = redirect_url | append: '&locale=' | append: encoded_redirect_locale
+      endif
+
+      if debug
+        echo '<!-- [LOCK DEBUG] ' | append: line_break
+        echo 'always_allow: ' | append: always_allow | append: ' | ' | append: line_break
+        echo 'in_preview: ' | append: in_preview | append: ' | ' | append: line_break
+        echo 'has_locks: ' | append: locks | append: ' | ' | append: line_break
+        echo 'page_locked: ' | append: page_locked | append: ' | ' | append: line_break
+        echo 'redirect_url: ' | append: redirect_url | append: ' | ' | append: line_break
+        echo 'redirect_locale: ' | append: redirect_locale | append: ' | ' | append: line_break
+        echo 'request.path: ' | append: request.path | append: ' | ' | append: line_break
+        if customer
+          echo 'customer.id: ' | append: customer.id | append: ' | ' | append: line_break
+          echo 'customer.tags: ' | append: customer.tags | append: ' | ' | append: line_break
+        else
+          echo 'customer: null | ' | append: line_break
+        endif
+        echo 'redirect_flow_key: ' | append: redirect_flow_key | append: ' | ' | append: line_break
+        echo '-->' | append: line_break
+      endif
+
+      echo '<!--|ISLOCKED|-->' | append: line_break
+      if redirect_url != ''
+        echo ' <meta http-equiv = "refresh" content = "0;URL=' | append: redirect_url | append: '" > '
+        echo ' <script type = "text/javascript" > window.location.href = "' | append: redirect_url | append: '"; </script>'
+      endif
+    endif
+  endif
+%}
