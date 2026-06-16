@@ -1,7 +1,3 @@
-{%- comment %}<locksmith:685b>{% endcomment -%}
-  {%- include 'locksmith' -%}
-{%- comment %}</locksmith:685b>{% endcomment -%}
-
 <!doctype html>
 <html
   {% if request.design_mode %}
@@ -9,8 +5,7 @@
   {% endif %}
   lang="{{ request.locale.iso_code }}"
 >
-  <head>{{ locksmith_initializations }}
-{% comment %} talon_start_e3e175d9 {% endcomment %}{% comment %} Default: not locking if talon_lock snippet missing {% endcomment %}{% capture talon_lock_cap_e576478e %}{% render 'talon_lock' %}{% endcapture %}{% unless talon_lock_cap_e576478e contains 'Liquid error' %} {{ talon_lock_cap_e576478e }} {% endunless %}{% comment %} talon_end_e3e175d9 {% endcomment %}{% comment %} talon_start_f0589f36 {% endcomment %}{% unless talon_lock_cap_e576478e contains '|ISLOCKED|' %}{% comment %} talon_end_f0589f36 {% endcomment %}
+  <head>{% comment %} talon_start_e3e175d9 {% endcomment %}{% comment %} Default: not locking if talon_lock snippet missing {% endcomment %}{% capture talon_lock_cap_e576478e %}{% render 'talon_lock' %}{% endcapture %}{% unless talon_lock_cap_e576478e contains 'Liquid error' %} {{ talon_lock_cap_e576478e }} {% endunless %}{% comment %} talon_end_e3e175d9 {% endcomment %}{% comment %} talon_start_f0589f36 {% endcomment %}{% unless talon_lock_cap_e576478e contains '|ISLOCKED|' %}{% comment %} talon_end_f0589f36 {% endcomment %}
     {%- if settings.favicon != blank -%}
       <link
         rel="icon"
