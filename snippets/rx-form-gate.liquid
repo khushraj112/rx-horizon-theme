@@ -1,1 +1,129 @@
-{%- if page.handle == 'rx-apply' or page.handle == 'rx-manual-review' -%}{%- assign rx_s = 'none' -%}{%- if customer == nil -%}{%- assign rx_s = 'guest' -%}{%- elsif customer.tags contains 'rx-verified' -%}{%- assign rx_s = 'verified' -%}{%- elsif customer.tags contains 'rx-review' -%}{%- assign rx_s = 'review' -%}{%- elsif customer.tags contains 'rx-pending' -%}{%- assign rx_s = 'pending' -%}{%- elsif customer.tags contains 'rx-rejected' -%}{%- assign rx_s = 'rejected' -%}{%- endif -%}{%- assign show_form = false -%}{%- if page.handle == 'rx-apply' and rx_s == 'none' -%}{%- assign show_form = true -%}{%- endif -%}{%- if page.handle == 'rx-manual-review' and rx_s == 'rejected' -%}{%- assign show_form = true -%}{%- endif -%}{%- unless show_form -%}<style>[id$='__forms_inline_WBPENk']{display:none!important;}</style><div class='rx-gate' style='border:1px solid #e3e3e3;border-radius:12px;padding:1.25rem 1.5rem;margin:1rem auto;max-width:640px;line-height:1.6;'>{%- if rx_s == 'guest' -%}<h3 style='margin:0 0 .5rem;'>Please log in</h3><p style='margin:0;'>Log in to your account to continue with prescription verification.</p><a href='/account/login' style='display:inline-block;margin-top:.75rem;padding:.6rem 1.2rem;background:#1a1a1a;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;'>Log in</a>{%- elsif rx_s == 'pending' -%}<h3 style='margin:0 0 .5rem;'>Application received</h3><p style='margin:0;'>Your license is being verified automatically. No need to submit again - this page updates on its own once it clears.</p>{%- elsif rx_s == 'review' -%}<h3 style='margin:0 0 .5rem;'>Under manual review</h3><p style='margin:0;'>Our team is reviewing your details. We will email you as soon as it is approved.</p>{%- elsif rx_s == 'verified' -%}<h3 style='margin:0 0 .5rem;'>You are verified</h3><p style='margin:0;'>Your prescription access is active. You can purchase Rx products now.</p>{%- elsif rx_s == 'rejected' -%}<h3 style='margin:0 0 .5rem;'>Manual review required</h3><p style='margin:0;'>We could not auto-verify your license. Please submit it for manual review.</p><a href='/pages/rx-manual-review' style='display:inline-block;margin-top:.75rem;padding:.6rem 1.2rem;background:#1a1a1a;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;'>Submit for manual review</a>{%- else -%}<h3 style='margin:0 0 .5rem;'>No application found</h3><p style='margin:0;'>Start by submitting your license for verification.</p><a href='/pages/rx-apply' style='display:inline-block;margin-top:.75rem;padding:.6rem 1.2rem;background:#1a1a1a;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;'>Apply now</a>{%- endif -%}</div>{%- endunless -%}{%- endif -%}
+{%- comment -%}
+  rx-form-gate.liquid — tag-aware gate with email lock
+{%- endcomment -%}
+
+{%- if template.name == 'page' and page.handle == 'rx-apply' -%}
+  {%- if customer -%}
+    {%- assign rx_tag = '' -%}
+    {%- if customer.tags contains 'rx-verified' -%}{%- assign rx_tag = 'verified' -%}
+    {%- elsif customer.tags contains 'rx-rejected' -%}{%- assign rx_tag = 'rejected' -%}
+    {%- elsif customer.tags contains 'rx-review' -%}{%- assign rx_tag = 'review' -%}
+    {%- elsif customer.tags contains 'rx-pending' -%}{%- assign rx_tag = 'pending' -%}
+    {%- endif -%}
+
+    {%- if rx_tag == 'pending' -%}
+      <style>[id*='__forms_inline']{display:none!important}</style>
+      <div style="margin:2rem 0;padding:1.5rem;background:#fff8e1;border:1px solid #f5c842;border-radius:8px;">
+        <h3 style="margin:0 0 0.5rem;">Application received</h3>
+        <p style="margin:0;">Your prescription licence is being verified. We will notify you by email once the review is complete.</p>
+      </div>
+
+    {%- elsif rx_tag == 'review' -%}
+      <style>[id*='__forms_inline']{display:none!important}</style>
+      <div style="margin:2rem 0;padding:1.5rem;background:#e8f4fd;border:1px solid #5ba4cf;border-radius:8px;">
+        <h3 style="margin:0 0 0.5rem;">Under manual review</h3>
+        <p style="margin:0;">Your application has been escalated for manual review. Our team will be in touch within 1-2 business days.</p>
+      </div>
+
+    {%- elsif rx_tag == 'rejected' -%}
+      <style>[id*='__forms_inline']{display:none!important}</style>
+      <div style="margin:2rem 0;padding:1.5rem;background:#fdecea;border:1px solid #e57373;border-radius:8px;">
+        <h3 style="margin:0 0 0.5rem;">Verification unsuccessful</h3>
+        <p style="margin:0 0 1rem;">We were unable to verify your licence automatically. Please submit for manual review.</p>
+        <a href="/pages/rx-manual-review" style="display:inline-block;padding:0.6rem 1.2rem;background:#111;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;">Submit for manual review</a>
+      </div>
+
+    {%- elsif rx_tag == 'verified' -%}
+      <style>[id*='__forms_inline']{display:none!important}</style>
+      <div style="margin:2rem 0;padding:1.5rem;background:#e8f5e9;border:1px solid #66bb6a;border-radius:8px;">
+        <h3 style="margin:0 0 0.5rem;">You are verified!</h3>
+        <p style="margin:0;">Your Rx licence has been approved. You can now purchase prescription items.</p>
+      </div>
+
+    {%- else -%}
+      <script>
+        (function(){
+          var em = {{ customer.email | json }};
+          if(!em) return;
+          function lock(){
+            document.querySelectorAll('[id*="__forms_inline"] input[type="email"],[id*="__forms_inline"] input[name="email"],[id*="__forms_inline"] input[autocomplete="email"]').forEach(function(i){
+              if(i.value===em) return;
+              i.value=em;
+              i.setAttribute('readonly','readonly');
+              i.style.background='#f5f5f5';
+              i.style.cursor='not-allowed';
+            });
+          }
+          lock();
+          new MutationObserver(lock).observe(document.body,{childList:true,subtree:true});
+          setTimeout(lock,500);
+          setTimeout(lock,1500);
+        })();
+      </script>
+    {%- endif -%}
+
+  {%- else -%}
+    <style>[id*='__forms_inline']{display:none!important}</style>
+    <div style="margin:2rem 0;padding:1.5rem;background:#f5f5f5;border:1px solid #ddd;border-radius:8px;">
+      <p style="margin:0;">Please <a href="/account/login?return_url=/pages/rx-apply">log in</a> to apply for Rx access.</p>
+    </div>
+  {%- endif -%}
+
+{%- elsif template.name == 'page' and page.handle == 'rx-manual-review' -%}
+  {%- if customer -%}
+    {%- assign rx_tag2 = '' -%}
+    {%- if customer.tags contains 'rx-verified' -%}{%- assign rx_tag2 = 'verified' -%}
+    {%- elsif customer.tags contains 'rx-rejected' -%}{%- assign rx_tag2 = 'rejected' -%}
+    {%- elsif customer.tags contains 'rx-review' -%}{%- assign rx_tag2 = 'review' -%}
+    {%- elsif customer.tags contains 'rx-pending' -%}{%- assign rx_tag2 = 'pending' -%}
+    {%- endif -%}
+
+    {%- if rx_tag2 == 'rejected' -%}
+      <script>
+        (function(){
+          var em = {{ customer.email | json }};
+          if(!em) return;
+          function lock(){
+            document.querySelectorAll('[id*="__forms_inline"] input[type="email"],[id*="__forms_inline"] input[name="email"],[id*="__forms_inline"] input[autocomplete="email"]').forEach(function(i){
+              if(i.value===em) return;
+              i.value=em;
+              i.setAttribute('readonly','readonly');
+              i.style.background='#f5f5f5';
+              i.style.cursor='not-allowed';
+            });
+          }
+          lock();
+          new MutationObserver(lock).observe(document.body,{childList:true,subtree:true});
+          setTimeout(lock,500);
+          setTimeout(lock,1500);
+        })();
+      </script>
+
+    {%- elsif rx_tag2 == 'pending' or rx_tag2 == 'review' -%}
+      <style>[id*='__forms_inline']{display:none!important}</style>
+      <div style="margin:2rem 0;padding:1.5rem;background:#e8f4fd;border:1px solid #5ba4cf;border-radius:8px;">
+        <h3 style="margin:0 0 0.5rem;">Application in progress</h3>
+        <p style="margin:0;">Your application is already under review. No further action is needed.</p>
+      </div>
+
+    {%- elsif rx_tag2 == 'verified' -%}
+      <style>[id*='__forms_inline']{display:none!important}</style>
+      <div style="margin:2rem 0;padding:1.5rem;background:#e8f5e9;border:1px solid #66bb6a;border-radius:8px;">
+        <h3 style="margin:0 0 0.5rem;">You are verified!</h3>
+        <p style="margin:0;">Your Rx licence has already been approved.</p>
+      </div>
+
+    {%- else -%}
+      <style>[id*='__forms_inline']{display:none!important}</style>
+      <div style="margin:2rem 0;padding:1.5rem;background:#f5f5f5;border:1px solid #ddd;border-radius:8px;">
+        <p style="margin:0;">No application found. Please <a href="/pages/rx-apply">submit your licence details</a> first.</p>
+      </div>
+    {%- endif -%}
+
+  {%- else -%}
+    <style>[id*='__forms_inline']{display:none!important}</style>
+    <div style="margin:2rem 0;padding:1.5rem;background:#f5f5f5;border:1px solid #ddd;border-radius:8px;">
+      <p style="margin:0;">Please <a href="/account/login?return_url=/pages/rx-manual-review">log in</a> to continue.</p>
+    </div>
+  {%- endif -%}
+{%- endif -%}
