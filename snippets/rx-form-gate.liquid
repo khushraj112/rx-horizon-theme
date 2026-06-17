@@ -67,6 +67,10 @@
           function showCountdown(url){
             if(window.__rxRedirecting) return;
             window.__rxRedirecting = true;
+            try {
+              var rxState = (window.location.pathname.indexOf('rx-manual-review') !== -1) ? 'review' : 'pending';
+              localStorage.setItem('rx_optimistic', JSON.stringify({ state: rxState, ts: Date.now() }));
+            } catch(e){}
             var ov = document.createElement('div');
             ov.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:99999;';
             ov.innerHTML = '<div style="background:#fff;padding:2rem 2.5rem;border-radius:12px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,0.2);"><div style="font-size:2rem;margin-bottom:0.5rem;">&#x2705;</div><h3 style="margin:0 0 0.5rem;font-size:1.2rem;">Application submitted!</h3><p style="margin:0;color:#555;">Redirecting in <strong id="rx-count">3</strong>s...</p></div>';
@@ -133,6 +137,10 @@
           function showCountdown(url){
             if(window.__rxRedirecting) return;
             window.__rxRedirecting = true;
+            try {
+              var rxState = (window.location.pathname.indexOf('rx-manual-review') !== -1) ? 'review' : 'pending';
+              localStorage.setItem('rx_optimistic', JSON.stringify({ state: rxState, ts: Date.now() }));
+            } catch(e){}
             var ov = document.createElement('div');
             ov.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:99999;';
             ov.innerHTML = '<div style="background:#fff;padding:2rem 2.5rem;border-radius:12px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,0.2);"><div style="font-size:2rem;margin-bottom:0.5rem;">&#x2705;</div><h3 style="margin:0 0 0.5rem;font-size:1.2rem;">Application submitted!</h3><p style="margin:0;color:#555;">Redirecting in <strong id="rx-count">3</strong>s...</p></div>';

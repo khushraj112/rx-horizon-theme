@@ -12,7 +12,19 @@
   Tags written by Shopify Flow: rx-pending | rx-verified | rx-rejected | rx-review
 {%- endcomment -%}
 
-<div class="rx-gate" style="border:1px solid var(--color-border, #e3e3e3);border-radius:12px;padding:1.25rem 1.5rem;margin:0.5rem 0;line-height:1.5;font-family:inherit;">
+{%- liquid
+  assign rx_server_state = 'untagged'
+  if customer == nil
+    assign rx_server_state = 'guest'
+  elsif customer.tags contains 'rx-pending'
+    assign rx_server_state = 'pending'
+  elsif customer.tags contains 'rx-review'
+    assign rx_server_state = 'review'
+  elsif customer.tags contains 'rx-rejected'
+    assign rx_server_state = 'rejected'
+  endif
+-%}
+<div class="rx-gate" data-rx-server="{{ rx_server_state }}" style="border:1px solid var(--color-border, #e3e3e3);border-radius:12px;padding:1.25rem 1.5rem;margin:0.5rem 0;line-height:1.5;font-family:inherit;">
   {%- if customer == nil -%}
     <h3 style="margin:0 0 .5rem;font-size:1.05rem;">Prescription verification required</h3>
     <p style="margin:0 0 1rem;opacity:.8;">Please log in to verify your prescription license and purchase this product.</p>
@@ -38,3 +50,58 @@
 
   {%- endif -%}
 </div>
+
+{%- comment -%}
+  Optimistic bridge: Shopify Flow takes a few seconds to apply the customer tag
+  after a form submit. Until it does, the server still renders the old state
+  (e.g. the "Verify"/"Submit" button), so we briefly show the next status from a
+  localStorage flag set on submit, then auto-refresh once the real tag lands.
+{%- endcomment -%}
+<script>
+  (function () {
+    var gate = document.querySelector('.rx-gate[data-rx-server]');
+    if (!gate) return;
+    var server = gate.getAttribute('data-rx-server');
+
+    var flag;
+    try { flag = JSON.parse(localStorage.getItem('rx_optimistic') || 'null'); } catch (e) { flag = null; }
+    if (!flag || !flag.state || !flag.ts) return;
+
+    // Expire stale optimistic state (e.g. Flow failed) so the customer can retry
+    if (Date.now() - flag.ts > 30 * 60 * 1000) { localStorage.removeItem('rx_optimistic'); return; }
+
+    function render(title, body) {
+      gate.innerHTML =
+        '<h3 style="margin:0 0 .5rem;font-size:1.05rem;">' + title + '</h3>' +
+        '<p style="margin:0;opacity:.8;">' + body + '</p>';
+    }
+
+    if (flag.state === 'pending' && server === 'untagged') {
+      render('Application received', 'Your prescription license is being verified. Purchasing will unlock automatically once it clears.');
+    } else if (flag.state === 'review' && server === 'rejected') {
+      render('Under manual review', "Our team is reviewing your details. We'll email you once it's approved — no further action needed right now.");
+    } else {
+      // Server has caught up (or a real decision was made) — trust it, drop the flag
+      localStorage.removeItem('rx_optimistic');
+      return;
+    }
+
+    // Auto-transition: poll the product page until the real tag lands, then refresh
+    var tries = 8;
+    (function poll() {
+      if (tries-- <= 0) return;
+      fetch(window.location.pathname + '?rxpoll=' + Date.now(), { credentials: 'same-origin' })
+        .then(function (r) { return r.text(); })
+        .then(function (html) {
+          var m = html.match(/data-rx-server="([^"]+)"/);
+          if (m && m[1] !== server) {
+            localStorage.removeItem('rx_optimistic');
+            window.location.href = window.location.pathname + '?rxv=' + Date.now();
+          } else {
+            setTimeout(poll, 5000);
+          }
+        })
+        .catch(function () { setTimeout(poll, 5000); });
+    })();
+  })();
+</script>
