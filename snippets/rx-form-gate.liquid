@@ -45,7 +45,9 @@
         (function(){
           var em = {{ customer.email | json }};
           if(!em) return;
-          var returnUrl = new URLSearchParams(window.location.search).get('return_url') || sessionStorage.getItem('rx_return_url') || document.referrer || '/';
+          var urlParam = new URLSearchParams(window.location.search).get('return_url');
+          if (urlParam && urlParam.charAt(0) === '/') { try { sessionStorage.setItem('rx_return_url', urlParam); } catch(e){} }
+          var returnUrl = urlParam || sessionStorage.getItem('rx_return_url') || document.referrer || '/';
           var nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
           function lockEmail(){
             document.querySelectorAll('[id*="__forms_inline"]').forEach(function(block){
@@ -109,7 +111,9 @@
         (function(){
           var em = {{ customer.email | json }};
           if(!em) return;
-          var returnUrl = new URLSearchParams(window.location.search).get('return_url') || sessionStorage.getItem('rx_return_url') || document.referrer || '/';
+          var urlParam = new URLSearchParams(window.location.search).get('return_url');
+          if (urlParam && urlParam.charAt(0) === '/') { try { sessionStorage.setItem('rx_return_url', urlParam); } catch(e){} }
+          var returnUrl = urlParam || sessionStorage.getItem('rx_return_url') || document.referrer || '/';
           var nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
           function lockEmail(){
             document.querySelectorAll('[id*="__forms_inline"]').forEach(function(block){
