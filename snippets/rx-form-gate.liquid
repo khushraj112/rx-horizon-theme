@@ -1,0 +1,181 @@
+{%- comment -%}
+  rx-form-gate.liquid — tag-aware gate v7: shadow-DOM email lock + post-submit countdown redirect
+{%- endcomment -%}
+
+{%- if template.name == 'page' and page.handle == 'rx-apply' -%}
+  {%- if customer -%}
+    {%- assign rx_tag = '' -%}
+    {%- if customer.tags contains 'rx-verified' -%}{%- assign rx_tag = 'verified' -%}
+    {%- elsif customer.tags contains 'rx-rejected' -%}{%- assign rx_tag = 'rejected' -%}
+    {%- elsif customer.tags contains 'rx-review' -%}{%- assign rx_tag = 'review' -%}
+    {%- elsif customer.tags contains 'rx-pending' -%}{%- assign rx_tag = 'pending' -%}
+    {%- endif -%}
+
+    {%- if rx_tag == 'pending' -%}
+      <style>[id*='__forms_inline']{display:none!important}</style>
+      <div style="margin:2rem 0;padding:1.5rem;background:#fff8e1;border:1px solid #f5c842;border-radius:8px;">
+        <h3 style="margin:0 0 0.5rem;">Application received</h3>
+        <p style="margin:0;">Your prescription licence is being verified. We will notify you by email once the review is complete.</p>
+      </div>
+
+    {%- elsif rx_tag == 'review' -%}
+      <style>[id*='__forms_inline']{display:none!important}</style>
+      <div style="margin:2rem 0;padding:1.5rem;background:#e8f4fd;border:1px solid #5ba4cf;border-radius:8px;">
+        <h3 style="margin:0 0 0.5rem;">Under manual review</h3>
+        <p style="margin:0;">Your application has been escalated for manual review. Our team will be in touch within 1-2 business days.</p>
+      </div>
+
+    {%- elsif rx_tag == 'rejected' -%}
+      <style>[id*='__forms_inline']{display:none!important}</style>
+      <div style="margin:2rem 0;padding:1.5rem;background:#fdecea;border:1px solid #e57373;border-radius:8px;">
+        <h3 style="margin:0 0 0.5rem;">Verification unsuccessful</h3>
+        <p style="margin:0 0 1rem;">We were unable to verify your licence automatically. Please submit for manual review.</p>
+        <a href="/pages/rx-manual-review" style="display:inline-block;padding:0.6rem 1.2rem;background:#111;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;">Submit for manual review</a>
+      </div>
+
+    {%- elsif rx_tag == 'verified' -%}
+      <style>[id*='__forms_inline']{display:none!important}</style>
+      <div style="margin:2rem 0;padding:1.5rem;background:#e8f5e9;border:1px solid #66bb6a;border-radius:8px;">
+        <h3 style="margin:0 0 0.5rem;">You are verified!</h3>
+        <p style="margin:0;">Your Rx licence has been approved. You can now purchase prescription items.</p>
+      </div>
+
+    {%- else -%}
+      <script>
+        (function(){
+          var em = {{ customer.email | json }};
+          if(!em) return;
+          var returnUrl = new URLSearchParams(window.location.search).get('return_url') || sessionStorage.getItem('rx_return_url') || document.referrer || '/';
+          var nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+          function lockEmail(){
+            document.querySelectorAll('[id*="__forms_inline"]').forEach(function(block){
+              Array.from(block.querySelectorAll('*')).filter(function(el){ return el.shadowRoot; }).forEach(function(host){
+                var inp = host.shadowRoot.querySelector('input#email');
+                if(inp){
+                  nativeSetter.call(inp, em);
+                  inp.dispatchEvent(new Event('input', {bubbles:true}));
+                  inp.dispatchEvent(new Event('change', {bubbles:true}));
+                  inp.setAttribute('readonly','readonly');
+                  inp.style.background='#f0f0f0';
+                  inp.style.cursor='not-allowed';
+                }
+              });
+            });
+          }
+          function showCountdown(url){
+            if(window.__rxRedirecting) return;
+            window.__rxRedirecting = true;
+            var ov = document.createElement('div');
+            ov.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:99999;';
+            ov.innerHTML = '<div style="background:#fff;padding:2rem 2.5rem;border-radius:12px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,0.2);"><div style="font-size:2rem;margin-bottom:0.5rem;">&#x2705;</div><h3 style="margin:0 0 0.5rem;font-size:1.2rem;">Application submitted!</h3><p style="margin:0;color:#555;">Redirecting in <strong id="rx-count">3</strong>s...</p></div>';
+            document.body.appendChild(ov);
+            var n=3; var t=setInterval(function(){ n--; var el=document.getElementById('rx-count'); if(el) el.textContent=n; if(n<=0){clearInterval(t);window.location.href=url;} },1000);
+          }
+          function watchSuccess(){
+            document.querySelectorAll('[id*="__forms_inline"]').forEach(function(block){
+              Array.from(block.querySelectorAll('*')).filter(function(el){ return el.shadowRoot; }).forEach(function(host){
+                new MutationObserver(function(){
+                  var s=host.shadowRoot; if(!s.querySelector('input#email')&&s.innerHTML.length>50){showCountdown(returnUrl);}
+                }).observe(host.shadowRoot,{childList:true,subtree:true});
+              });
+            });
+          }
+          lockEmail();
+          new MutationObserver(lockEmail).observe(document.body,{childList:true,subtree:true});
+          setTimeout(lockEmail,300); setTimeout(lockEmail,800); setTimeout(lockEmail,2000);
+          setTimeout(watchSuccess,1500);
+        })();
+      </script>
+    {%- endif -%}
+
+  {%- else -%}
+    <style>[id*='__forms_inline']{display:none!important}</style>
+    <div style="margin:2rem 0;padding:1.5rem;background:#f5f5f5;border:1px solid #ddd;border-radius:8px;">
+      <p style="margin:0;">Please <a href="{{ routes.account_login_url }}?return_url=/pages/rx-apply">log in</a> to apply for Rx access.</p>
+    </div>
+  {%- endif -%}
+
+{%- elsif template.name == 'page' and page.handle == 'rx-manual-review' -%}
+  {%- if customer -%}
+    {%- assign rx_tag2 = '' -%}
+    {%- if customer.tags contains 'rx-verified' -%}{%- assign rx_tag2 = 'verified' -%}
+    {%- elsif customer.tags contains 'rx-rejected' -%}{%- assign rx_tag2 = 'rejected' -%}
+    {%- elsif customer.tags contains 'rx-review' -%}{%- assign rx_tag2 = 'review' -%}
+    {%- elsif customer.tags contains 'rx-pending' -%}{%- assign rx_tag2 = 'pending' -%}
+    {%- endif -%}
+
+    {%- if rx_tag2 == 'rejected' -%}
+      <script>
+        (function(){
+          var em = {{ customer.email | json }};
+          if(!em) return;
+          var returnUrl = new URLSearchParams(window.location.search).get('return_url') || sessionStorage.getItem('rx_return_url') || document.referrer || '/';
+          var nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+          function lockEmail(){
+            document.querySelectorAll('[id*="__forms_inline"]').forEach(function(block){
+              Array.from(block.querySelectorAll('*')).filter(function(el){ return el.shadowRoot; }).forEach(function(host){
+                var inp = host.shadowRoot.querySelector('input#email');
+                if(inp){
+                  nativeSetter.call(inp, em);
+                  inp.dispatchEvent(new Event('input', {bubbles:true}));
+                  inp.dispatchEvent(new Event('change', {bubbles:true}));
+                  inp.setAttribute('readonly','readonly');
+                  inp.style.background='#f0f0f0';
+                  inp.style.cursor='not-allowed';
+                }
+              });
+            });
+          }
+          function showCountdown(url){
+            if(window.__rxRedirecting) return;
+            window.__rxRedirecting = true;
+            var ov = document.createElement('div');
+            ov.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:99999;';
+            ov.innerHTML = '<div style="background:#fff;padding:2rem 2.5rem;border-radius:12px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,0.2);"><div style="font-size:2rem;margin-bottom:0.5rem;">&#x2705;</div><h3 style="margin:0 0 0.5rem;font-size:1.2rem;">Application submitted!</h3><p style="margin:0;color:#555;">Redirecting in <strong id="rx-count">3</strong>s...</p></div>';
+            document.body.appendChild(ov);
+            var n=3; var t=setInterval(function(){ n--; var el=document.getElementById('rx-count'); if(el) el.textContent=n; if(n<=0){clearInterval(t);window.location.href=url;} },1000);
+          }
+          function watchSuccess(){
+            document.querySelectorAll('[id*="__forms_inline"]').forEach(function(block){
+              Array.from(block.querySelectorAll('*')).filter(function(el){ return el.shadowRoot; }).forEach(function(host){
+                new MutationObserver(function(){
+                  var s=host.shadowRoot; if(!s.querySelector('input#email')&&s.innerHTML.length>50){showCountdown(returnUrl);}
+                }).observe(host.shadowRoot,{childList:true,subtree:true});
+              });
+            });
+          }
+          lockEmail();
+          new MutationObserver(lockEmail).observe(document.body,{childList:true,subtree:true});
+          setTimeout(lockEmail,300); setTimeout(lockEmail,800); setTimeout(lockEmail,2000);
+          setTimeout(watchSuccess,1500);
+        })();
+      </script>
+
+    {%- elsif rx_tag2 == 'pending' or rx_tag2 == 'review' -%}
+      <style>[id*='__forms_inline']{display:none!important}</style>
+      <div style="margin:2rem 0;padding:1.5rem;background:#e8f4fd;border:1px solid #5ba4cf;border-radius:8px;">
+        <h3 style="margin:0 0 0.5rem;">Application in progress</h3>
+        <p style="margin:0;">Your application is already under review. No further action is needed.</p>
+      </div>
+
+    {%- elsif rx_tag2 == 'verified' -%}
+      <style>[id*='__forms_inline']{display:none!important}</style>
+      <div style="margin:2rem 0;padding:1.5rem;background:#e8f5e9;border:1px solid #66bb6a;border-radius:8px;">
+        <h3 style="margin:0 0 0.5rem;">You are verified!</h3>
+        <p style="margin:0;">Your Rx licence has already been approved.</p>
+      </div>
+
+    {%- else -%}
+      <style>[id*='__forms_inline']{display:none!important}</style>
+      <div style="margin:2rem 0;padding:1.5rem;background:#f5f5f5;border:1px solid #ddd;border-radius:8px;">
+        <p style="margin:0;">No application found. Please <a href="/pages/rx-apply">submit your licence details</a> first.</p>
+      </div>
+    {%- endif -%}
+
+  {%- else -%}
+    <style>[id*='__forms_inline']{display:none!important}</style>
+    <div style="margin:2rem 0;padding:1.5rem;background:#f5f5f5;border:1px solid #ddd;border-radius:8px;">
+      <p style="margin:0;">Please <a href="{{ routes.account_login_url }}?return_url=/pages/rx-manual-review">log in</a> to continue.</p>
+    </div>
+  {%- endif -%}
+{%- endif -%}
