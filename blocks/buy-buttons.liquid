@@ -21,10 +21,13 @@
     customer is tagged rx-verified. Normal products are unaffected.
   endcomment
   assign rx_gated = false
+  assign rx_verified_badge = false
   if product.tags contains 'requires-rx'
-    unless customer.tags contains 'rx-verified'
+    if customer.tags contains 'rx-verified'
+      assign rx_verified_badge = true
+    else
       assign rx_gated = true
-    endunless
+    endif
   endif
 
   if variant
@@ -230,6 +233,12 @@
           {%- if rx_gated -%}
             {% render 'rx-gate', product: product, customer: customer %}
           {%- else -%}
+            {%- if rx_verified_badge -%}
+              <div class="rx-verified-badge" style="display:flex;align-items:center;gap:.5rem;padding:.6rem .9rem;margin:0 0 .75rem;background:#e8f5e9;border:1px solid #66bb6a;border-radius:8px;color:#1b5e20;font-weight:600;font-size:.95rem;line-height:1.3;">
+                <span aria-hidden="true" style="font-size:1.05rem;">&#10003;</span>
+                <span>Prescription license verified &mdash; you're approved to purchase.</span>
+              </div>
+            {%- endif -%}
             {% content_for 'block',
               type: 'add-to-cart',
               id: 'add-to-cart',
