@@ -49,12 +49,15 @@
             document.querySelectorAll('[id*="__forms_inline"]').forEach(function(block){
               Array.from(block.querySelectorAll('*')).filter(function(el){ return el.shadowRoot; }).forEach(function(host){
                 var inp = host.shadowRoot.querySelector('input#email');
-                if(inp && inp.value !== em){
-                  inp.value = em;
-                  inp.setAttribute('readonly','readonly');
-                  inp.style.background='#f0f0f0';
-                  inp.style.cursor='not-allowed';
-                }
+if(inp){
+  var nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+  nativeSetter.call(inp, em);
+  inp.dispatchEvent(new Event('input', {bubbles:true}));
+  inp.dispatchEvent(new Event('change', {bubbles:true}));
+  inp.setAttribute('readonly','readonly');
+  inp.style.background='#f0f0f0';
+  inp.style.cursor='not-allowed';
+}
               });
             });
           }
