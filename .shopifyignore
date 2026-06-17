@@ -1,0 +1,7 @@
+# Ignore editor atomic-save temp files so `shopify theme dev` doesn't try to
+# upload them (Shopify rejects non-.liquid files in snippets/ etc.)
+*.tmp
+*.tmp.*
+*.liquid.tmp*
+*~
+.DS_Store
