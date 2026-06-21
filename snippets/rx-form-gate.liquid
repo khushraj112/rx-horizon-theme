@@ -1,15 +1,34 @@
 {%- comment -%}
-  rx-form-gate.liquid — tag-aware gate v7: shadow-DOM email lock + post-submit countdown redirect
+  rx-form-gate.liquid — tag-aware gate v8: server-side source of truth (no localStorage).
+
+  Shopify Flow tags are authoritative. Shopify Forms writes SYNCHRONOUSLY on submit,
+  so we bridge the window before Flow's tag lands using a server-readable signal:
+    Form 1 submitted → tag shopify-forms-1031424 OR metafield talon-approval.license_number
+    Form 2 submitted → tag shopify-forms-1031795 OR metafield custom.licensecredential_document
+  This stops the form from reappearing after submit without any client-side persistence.
 {%- endcomment -%}
 
 {%- if template.name == 'page' and page.handle == 'rx-apply' -%}
   {%- if customer -%}
-    {%- assign rx_tag = '' -%}
-    {%- if customer.tags contains 'rx-verified' -%}{%- assign rx_tag = 'verified' -%}
-    {%- elsif customer.tags contains 'rx-rejected' -%}{%- assign rx_tag = 'rejected' -%}
-    {%- elsif customer.tags contains 'rx-review' -%}{%- assign rx_tag = 'review' -%}
-    {%- elsif customer.tags contains 'rx-pending' -%}{%- assign rx_tag = 'pending' -%}
-    {%- endif -%}
+    {%- liquid
+      assign rx_tag = ''
+      if customer.tags contains 'rx-verified'
+        assign rx_tag = 'verified'
+      elsif customer.tags contains 'rx-rejected'
+        assign rx_tag = 'rejected'
+      elsif customer.tags contains 'rx-review'
+        assign rx_tag = 'review'
+      elsif customer.tags contains 'rx-pending'
+        assign rx_tag = 'pending'
+      endif
+
+      assign rx_f1 = false
+      if customer.tags contains 'shopify-forms-1031424'
+        assign rx_f1 = true
+      elsif customer.metafields['talon-approval']['license_number'].value != blank
+        assign rx_f1 = true
+      endif
+    -%}
 
     {%- if rx_tag == 'pending' -%}
       <style>[id*='__forms_inline']{display:none!important}</style>
@@ -40,6 +59,14 @@
         <p style="margin:0;">Your Rx licence has been approved. You can now purchase prescription items.</p>
       </div>
 
+    {%- elsif rx_f1 -%}
+      {%- comment -%} Form 1 submitted; Flow hasn't applied rx-pending yet. Bridge with server truth. {%- endcomment -%}
+      <style>[id*='__forms_inline']{display:none!important}</style>
+      <div style="margin:2rem 0;padding:1.5rem;background:#fff8e1;border:1px solid #f5c842;border-radius:8px;">
+        <h3 style="margin:0 0 0.5rem;">Application received</h3>
+        <p style="margin:0;">Your prescription licence is being verified. We will notify you by email once the review is complete.</p>
+      </div>
+
     {%- else -%}
       <script>
         (function(){
@@ -67,10 +94,6 @@
           function showCountdown(url){
             if(window.__rxRedirecting) return;
             window.__rxRedirecting = true;
-            try {
-              var rxState = (window.location.pathname.indexOf('rx-manual-review') !== -1) ? 'review' : 'pending';
-              localStorage.setItem('rx_optimistic', JSON.stringify({ state: rxState, ts: Date.now() }));
-            } catch(e){}
             var ov = document.createElement('div');
             ov.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:99999;';
             ov.innerHTML = '<div style="background:#fff;padding:2rem 2.5rem;border-radius:12px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,0.2);"><div style="font-size:2rem;margin-bottom:0.5rem;">&#x2705;</div><h3 style="margin:0 0 0.5rem;font-size:1.2rem;">Application submitted!</h3><p style="margin:0;color:#555;">Redirecting in <strong id="rx-count">3</strong>s...</p></div>';
@@ -103,14 +126,49 @@
 
 {%- elsif template.name == 'page' and page.handle == 'rx-manual-review' -%}
   {%- if customer -%}
-    {%- assign rx_tag2 = '' -%}
-    {%- if customer.tags contains 'rx-verified' -%}{%- assign rx_tag2 = 'verified' -%}
-    {%- elsif customer.tags contains 'rx-rejected' -%}{%- assign rx_tag2 = 'rejected' -%}
-    {%- elsif customer.tags contains 'rx-review' -%}{%- assign rx_tag2 = 'review' -%}
-    {%- elsif customer.tags contains 'rx-pending' -%}{%- assign rx_tag2 = 'pending' -%}
-    {%- endif -%}
+    {%- liquid
+      assign rx_tag2 = ''
+      if customer.tags contains 'rx-verified'
+        assign rx_tag2 = 'verified'
+      elsif customer.tags contains 'rx-rejected'
+        assign rx_tag2 = 'rejected'
+      elsif customer.tags contains 'rx-review'
+        assign rx_tag2 = 'review'
+      elsif customer.tags contains 'rx-pending'
+        assign rx_tag2 = 'pending'
+      endif
 
-    {%- if rx_tag2 == 'rejected' -%}
+      assign rx_f2 = false
+      if customer.tags contains 'shopify-forms-1031795'
+        assign rx_f2 = true
+      elsif customer.metafields.custom.licensecredential_document.value != blank
+        assign rx_f2 = true
+      endif
+    -%}
+
+    {%- if rx_tag2 == 'verified' -%}
+      <style>[id*='__forms_inline']{display:none!important}</style>
+      <div style="margin:2rem 0;padding:1.5rem;background:#e8f5e9;border:1px solid #66bb6a;border-radius:8px;">
+        <h3 style="margin:0 0 0.5rem;">You are verified!</h3>
+        <p style="margin:0;">Your Rx licence has already been approved.</p>
+      </div>
+
+    {%- elsif rx_tag2 == 'pending' or rx_tag2 == 'review' -%}
+      <style>[id*='__forms_inline']{display:none!important}</style>
+      <div style="margin:2rem 0;padding:1.5rem;background:#e8f4fd;border:1px solid #5ba4cf;border-radius:8px;">
+        <h3 style="margin:0 0 0.5rem;">Application in progress</h3>
+        <p style="margin:0;">Your application is already under review. No further action is needed.</p>
+      </div>
+
+    {%- elsif rx_tag2 == 'rejected' and rx_f2 -%}
+      {%- comment -%} Form 2 submitted; Flow hasn't flipped rx-rejected → rx-review yet. Bridge with server truth. {%- endcomment -%}
+      <style>[id*='__forms_inline']{display:none!important}</style>
+      <div style="margin:2rem 0;padding:1.5rem;background:#e8f4fd;border:1px solid #5ba4cf;border-radius:8px;">
+        <h3 style="margin:0 0 0.5rem;">Application in progress</h3>
+        <p style="margin:0;">Your manual review request has been received. No further action is needed.</p>
+      </div>
+
+    {%- elsif rx_tag2 == 'rejected' -%}
       <script>
         (function(){
           var em = {{ customer.email | json }};
@@ -137,10 +195,6 @@
           function showCountdown(url){
             if(window.__rxRedirecting) return;
             window.__rxRedirecting = true;
-            try {
-              var rxState = (window.location.pathname.indexOf('rx-manual-review') !== -1) ? 'review' : 'pending';
-              localStorage.setItem('rx_optimistic', JSON.stringify({ state: rxState, ts: Date.now() }));
-            } catch(e){}
             var ov = document.createElement('div');
             ov.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:99999;';
             ov.innerHTML = '<div style="background:#fff;padding:2rem 2.5rem;border-radius:12px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,0.2);"><div style="font-size:2rem;margin-bottom:0.5rem;">&#x2705;</div><h3 style="margin:0 0 0.5rem;font-size:1.2rem;">Application submitted!</h3><p style="margin:0;color:#555;">Redirecting in <strong id="rx-count">3</strong>s...</p></div>';
@@ -162,20 +216,6 @@
           setTimeout(watchSuccess,1500);
         })();
       </script>
-
-    {%- elsif rx_tag2 == 'pending' or rx_tag2 == 'review' -%}
-      <style>[id*='__forms_inline']{display:none!important}</style>
-      <div style="margin:2rem 0;padding:1.5rem;background:#e8f4fd;border:1px solid #5ba4cf;border-radius:8px;">
-        <h3 style="margin:0 0 0.5rem;">Application in progress</h3>
-        <p style="margin:0;">Your application is already under review. No further action is needed.</p>
-      </div>
-
-    {%- elsif rx_tag2 == 'verified' -%}
-      <style>[id*='__forms_inline']{display:none!important}</style>
-      <div style="margin:2rem 0;padding:1.5rem;background:#e8f5e9;border:1px solid #66bb6a;border-radius:8px;">
-        <h3 style="margin:0 0 0.5rem;">You are verified!</h3>
-        <p style="margin:0;">Your Rx licence has already been approved.</p>
-      </div>
 
     {%- else -%}
       <style>[id*='__forms_inline']{display:none!important}</style>
