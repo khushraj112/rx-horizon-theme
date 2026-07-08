@@ -1,0 +1,445 @@
+{%- liquid
+  assign showcase_collection = section.settings.collection
+  assign featured_product = section.settings.featured_product
+
+  if featured_product == blank and showcase_collection != blank
+    assign featured_product = showcase_collection.products.first
+  endif
+
+  assign max_products = section.settings.max_products
+-%}
+
+<div class="section-background color-{{ section.settings.color_scheme }}"></div>
+<section
+  class="section section--{{ section.settings.section_width }} color-{{ section.settings.color_scheme }} home-product-showcase spacing-style"
+  style="{% render 'spacing-style', settings: section.settings %}"
+>
+  <div class="home-product-showcase__header">
+    <div>
+      <p class="home-product-showcase__eyebrow">{{ section.settings.eyebrow }}</p>
+      <h2 class="home-product-showcase__heading">{{ section.settings.heading }}</h2>
+    </div>
+
+    {%- if showcase_collection != blank -%}
+      <a class="home-product-showcase__view-all" href="{{ showcase_collection.url }}">
+        {{ section.settings.link_label }}
+      </a>
+    {%- endif -%}
+  </div>
+
+  <div class="home-product-showcase__layout">
+    <article class="home-product-showcase__featured">
+      {%- if featured_product != blank -%}
+        <a class="home-product-showcase__featured-media" href="{{ featured_product.url }}">
+          {%- if featured_product.featured_image -%}
+            {{
+              featured_product.featured_image
+              | image_url: width: 1100
+              | image_tag:
+                widths: '500, 700, 900, 1100',
+                sizes: '(min-width: 990px) 44vw, 100vw',
+                loading: 'eager',
+                class: 'home-product-showcase__image'
+            }}
+          {%- else -%}
+            {{ 'product-apparel-1' | placeholder_svg_tag: 'home-product-showcase__placeholder' }}
+          {%- endif -%}
+        </a>
+
+        <div class="home-product-showcase__featured-content">
+          {%- if featured_product.tags contains 'requires-rx' -%}
+            <span class="home-product-showcase__rx-pill">Rx verification required</span>
+          {%- endif -%}
+
+          <h3 class="home-product-showcase__featured-title">
+            <a href="{{ featured_product.url }}">{{ featured_product.title }}</a>
+          </h3>
+
+          <div class="home-product-showcase__price">
+            {% render 'price', product_resource: featured_product, show_sale_price_first: true %}
+          </div>
+
+          {%- if section.settings.description != blank -%}
+            <p class="home-product-showcase__copy">{{ section.settings.description }}</p>
+          {%- endif -%}
+
+          <a class="button home-product-showcase__button" href="{{ featured_product.url }}">
+            {{ section.settings.button_label }}
+          </a>
+        </div>
+      {%- else -%}
+        <div class="home-product-showcase__empty">
+          <h3>{{ 'content.product_card_placeholder' | t }}</h3>
+        </div>
+      {%- endif -%}
+    </article>
+
+    <div class="home-product-showcase__grid" aria-label="{{ section.settings.heading | escape }}">
+      {%- if showcase_collection != blank and showcase_collection.products_count > 0 -%}
+        {%- for product in showcase_collection.products limit: max_products -%}
+          {%- if featured_product != blank and product.id == featured_product.id -%}
+            {%- continue -%}
+          {%- endif -%}
+
+          <a class="home-product-showcase__item" href="{{ product.url }}">
+            <span class="home-product-showcase__item-media">
+              {%- if product.featured_image -%}
+                {{
+                  product.featured_image
+                  | image_url: width: 420
+                  | image_tag:
+                    widths: '240, 320, 420',
+                    sizes: '(min-width: 990px) 18vw, 44vw',
+                    loading: 'lazy',
+                    class: 'home-product-showcase__item-image'
+                }}
+              {%- else -%}
+                {{ 'product-apparel-2' | placeholder_svg_tag: 'home-product-showcase__placeholder' }}
+              {%- endif -%}
+            </span>
+
+            <span class="home-product-showcase__item-info">
+              {%- if product.tags contains 'requires-rx' -%}
+                <span class="home-product-showcase__item-rx">Rx</span>
+              {%- endif -%}
+              <span class="home-product-showcase__item-title">{{ product.title }}</span>
+              <span class="home-product-showcase__item-price">
+                {% render 'price', product_resource: product, show_sale_price_first: true %}
+              </span>
+            </span>
+          </a>
+        {%- endfor -%}
+      {%- else -%}
+        {%- for i in (1..6) -%}
+          <div class="home-product-showcase__item">
+            <span class="home-product-showcase__item-media">
+              {{ 'product-apparel-2' | placeholder_svg_tag: 'home-product-showcase__placeholder' }}
+            </span>
+            <span class="home-product-showcase__item-info">
+              <span class="home-product-showcase__item-title">{{ 'content.product_card_placeholder' | t }}</span>
+            </span>
+          </div>
+        {%- endfor -%}
+      {%- endif -%}
+    </div>
+  </div>
+</section>
+
+{% stylesheet %}
+  .home-product-showcase {
+    --showcase-radius: 8px;
+    --showcase-border: rgb(var(--color-border-rgb) / 0.62);
+    --showcase-muted: rgb(var(--color-foreground-rgb) / 0.68);
+  }
+
+  .home-product-showcase__header {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--gap-xl);
+    align-items: flex-end;
+    margin-block-end: var(--margin-2xl);
+    padding-block-end: var(--padding-md);
+    border-block-end: 1px solid rgb(var(--color-border-rgb) / 0.45);
+  }
+
+  .home-product-showcase__eyebrow {
+    margin: 0 0 var(--margin-xs);
+    color: var(--showcase-muted);
+    font-size: var(--font-size--sm);
+  }
+
+  .home-product-showcase__heading {
+    margin: 0;
+  }
+
+  .home-product-showcase__view-all {
+    color: var(--color-foreground);
+    text-decoration: underline;
+    text-underline-offset: 0.25em;
+    white-space: nowrap;
+  }
+
+  .home-product-showcase__layout {
+    display: grid;
+    grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.25fr);
+    gap: var(--gap-2xl);
+    align-items: stretch;
+  }
+
+  .home-product-showcase__featured,
+  .home-product-showcase__item {
+    border: 1px solid var(--showcase-border);
+    border-radius: var(--showcase-radius);
+    background: rgb(var(--color-background-rgb));
+    overflow: hidden;
+  }
+
+  .home-product-showcase__featured {
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) auto;
+    min-height: 100%;
+  }
+
+  .home-product-showcase__featured-media,
+  .home-product-showcase__item-media {
+    display: block;
+    background: rgb(var(--color-foreground-rgb) / 0.035);
+  }
+
+  .home-product-showcase__featured-media {
+    aspect-ratio: 1 / 1;
+  }
+
+  .home-product-showcase__image,
+  .home-product-showcase__item-image,
+  .home-product-showcase__placeholder {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .home-product-showcase__featured-content {
+    padding: var(--padding-xl);
+  }
+
+  .home-product-showcase__rx-pill,
+  .home-product-showcase__item-rx {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    border: 1px solid rgb(var(--color-foreground-rgb) / 0.18);
+    border-radius: 999px;
+    color: var(--color-foreground);
+    background: rgb(var(--color-foreground-rgb) / 0.055);
+  }
+
+  .home-product-showcase__rx-pill {
+    padding: 0.35rem 0.65rem;
+    margin-block-end: var(--margin-sm);
+    font-size: var(--font-size--xs);
+  }
+
+  .home-product-showcase__featured-title {
+    margin: 0 0 var(--margin-xs);
+  }
+
+  .home-product-showcase__featured-title a,
+  .home-product-showcase__item {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .home-product-showcase__price {
+    margin-block-end: var(--margin-md);
+  }
+
+  .home-product-showcase__copy {
+    margin: 0 0 var(--margin-lg);
+    color: var(--showcase-muted);
+    max-width: 34rem;
+  }
+
+  .home-product-showcase__button {
+    width: fit-content;
+  }
+
+  .home-product-showcase__grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--gap-md);
+  }
+
+  .home-product-showcase__item {
+    display: grid;
+    grid-template-rows: auto 1fr;
+    min-width: 0;
+    transition:
+      transform var(--animation-speed) var(--animation-easing),
+      box-shadow var(--animation-speed) var(--animation-easing),
+      border-color var(--animation-speed) var(--animation-easing);
+  }
+
+  .home-product-showcase__item:hover {
+    transform: translateY(-3px);
+    border-color: rgb(var(--color-foreground-rgb) / 0.2);
+    box-shadow: 0 16px 36px rgb(var(--color-foreground-rgb) / 0.08);
+  }
+
+  .home-product-showcase__item-media {
+    aspect-ratio: 1 / 1;
+  }
+
+  .home-product-showcase__item-info {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap-2xs);
+    padding: var(--padding-sm);
+    min-width: 0;
+  }
+
+  .home-product-showcase__item-rx {
+    padding: 0.15rem 0.45rem;
+    font-size: var(--font-size--3xs);
+  }
+
+  .home-product-showcase__item-title {
+    font-weight: var(--font-weight-medium);
+    line-height: var(--line-height-tight);
+  }
+
+  .home-product-showcase__item-price {
+    color: var(--showcase-muted);
+    font-size: var(--font-size--sm);
+  }
+
+  .home-product-showcase__empty {
+    min-height: 24rem;
+    display: grid;
+    place-items: center;
+    padding: var(--padding-xl);
+  }
+
+  @media screen and (max-width: 989px) {
+    .home-product-showcase__layout {
+      grid-template-columns: 1fr;
+    }
+
+    .home-product-showcase__grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media screen and (max-width: 749px) {
+    .home-product-showcase__header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: var(--gap-md);
+      margin-block-end: var(--margin-xl);
+    }
+
+    .home-product-showcase__featured-content {
+      padding: var(--padding-lg);
+    }
+
+    .home-product-showcase__grid {
+      gap: var(--gap-sm);
+    }
+
+    .home-product-showcase__item-info {
+      padding: var(--padding-xs);
+    }
+  }
+{% endstylesheet %}
+
+{% schema %}
+{
+  "name": "Home product showcase",
+  "disabled_on": {
+    "groups": ["header", "footer"]
+  },
+  "settings": [
+    {
+      "type": "collection",
+      "id": "collection",
+      "label": "Collection"
+    },
+    {
+      "type": "product",
+      "id": "featured_product",
+      "label": "Featured product"
+    },
+    {
+      "type": "text",
+      "id": "eyebrow",
+      "label": "Eyebrow",
+      "default": "Featured Rx products"
+    },
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Heading",
+      "default": "Explore the collection"
+    },
+    {
+      "type": "textarea",
+      "id": "description",
+      "label": "Featured product text",
+      "default": "Review product details, complete verification when required, and purchase through the secure checkout flow."
+    },
+    {
+      "type": "text",
+      "id": "button_label",
+      "label": "Featured button label",
+      "default": "View product"
+    },
+    {
+      "type": "text",
+      "id": "link_label",
+      "label": "Collection link label",
+      "default": "View all"
+    },
+    {
+      "type": "range",
+      "id": "max_products",
+      "label": "Products shown",
+      "min": 4,
+      "max": 10,
+      "step": 1,
+      "default": 7
+    },
+    {
+      "type": "select",
+      "id": "section_width",
+      "label": "Width",
+      "options": [
+        {
+          "value": "page-width",
+          "label": "Page"
+        },
+        {
+          "value": "full-width",
+          "label": "Full"
+        }
+      ],
+      "default": "page-width"
+    },
+    {
+      "type": "color_scheme",
+      "id": "color_scheme",
+      "label": "Color scheme",
+      "default": "scheme-1"
+    },
+    {
+      "type": "header",
+      "content": "Padding"
+    },
+    {
+      "type": "range",
+      "id": "padding-block-start",
+      "label": "Top",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "unit": "px",
+      "default": 72
+    },
+    {
+      "type": "range",
+      "id": "padding-block-end",
+      "label": "Bottom",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "unit": "px",
+      "default": 80
+    }
+  ],
+  "presets": [
+    {
+      "name": "Home product showcase",
+      "category": "Products"
+    }
+  ]
+}
+{% endschema %}

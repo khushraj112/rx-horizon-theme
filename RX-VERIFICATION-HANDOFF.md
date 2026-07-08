@@ -48,6 +48,7 @@ Goal: only `rx-verified` customers can buy products tagged `requires-rx`. Everyt
 - Flows fire correctly: a live test submission (email khushrajisngh13s@gmail.com, State MI) → Rx Bridge added `rx-pending` → Veriflow saw MI unsupported → flipped to `rx-rejected`. Full chain completed automatically.
 - Both form-triggered flows are bound to their form by name, so they don't cross-fire.
 
+
 ---
 
 ## KEY OPEN ISSUE — email vs login mismatch

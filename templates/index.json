@@ -15,7 +15,7 @@
           "type": "text",
           "name": "t:names.heading",
           "settings": {
-            "text": "<p>Browse our latest products</p>",
+            "text": "<p>Shop verified Rx essentials</p>",
             "width": "fit-content",
             "max_width": "normal",
             "alignment": "left",
@@ -86,6 +86,24 @@
         "reflection_opacity": 75,
         "padding-block-start": 100,
         "padding-block-end": 72
+      }
+    },
+    "home_product_showcase": {
+      "type": "home-product-showcase",
+      "name": "Product showcase",
+      "settings": {
+        "collection": "all",
+        "featured_product": "",
+        "eyebrow": "Featured Rx products",
+        "heading": "Product spotlight",
+        "description": "Review the featured item, see whether Rx verification is required, and browse related products without losing context.",
+        "button_label": "View product",
+        "link_label": "View all",
+        "max_products": 7,
+        "section_width": "page-width",
+        "color_scheme": "scheme-1",
+        "padding-block-start": 72,
+        "padding-block-end": 80
       }
     },
     "product_list_fa6P9H": {
@@ -285,6 +303,7 @@
   },
   "order": [
     "hero_jVaWmY",
+    "home_product_showcase",
     "product_list_fa6P9H"
   ]
 }
