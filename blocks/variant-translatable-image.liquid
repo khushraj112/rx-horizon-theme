@@ -1,0 +1,79 @@
+<script
+  src="{{ 'variant-translatable-image.js' | asset_url }}"
+  type="module"
+  fetchpriority="low"
+></script>
+
+{%- doc -%}
+  Renders the selected variant's `custom.translatable_image` metafield.
+
+  The metafield is a file_reference restricted to images, so its `.value` resolves to a
+  media_image object whose `.image` holds the Image. Passing that Image straight to
+  `image_tag` lets Shopify emit width/height/aspect itself — avoid reading
+  `.aspect_ratio` off the media_image, which is nil.
+
+  There is deliberately no locale logic here: Shopify serves the translated metafield
+  value for the active locale, so the theme is a passive consumer.
+{%- enddoc -%}
+
+{% liquid
+  assign variant = closest.product.selected_or_first_available_variant
+  assign variant_image = variant.metafields.custom.translatable_image.value
+  assign image = variant_image.image | default: variant_image
+%}
+
+<variant-translatable-image
+  class="variant-translatable-image spacing-style"
+  data-product-id="{{ closest.product.id }}"
+  style="--border-radius: {{ block.settings.border_radius }}px;"
+  {{ block.shopify_attributes }}
+>
+  {%- if image -%}
+    {{
+      image
+      | image_url: width: 1600
+      | image_tag:
+        widths: '240, 352, 512, 832, 1200, 1600',
+        sizes: '(min-width: 750px) 50vw, 100vw',
+        loading: 'lazy',
+        class: 'variant-translatable-image__img',
+        alt: variant_image.alt
+    }}
+  {%- endif -%}
+</variant-translatable-image>
+
+{% stylesheet %}
+  variant-translatable-image {
+    display: block;
+  }
+
+  .variant-translatable-image__img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: var(--border-radius, 0);
+  }
+{% endstylesheet %}
+
+{% schema %}
+{
+  "name": "Variant translated image",
+  "tag": null,
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "Shows the selected variant's Translatable Image metafield (custom.translatable_image). Renders nothing when the variant has no value."
+    },
+    {
+      "type": "range",
+      "id": "border_radius",
+      "label": "t:settings.border_radius",
+      "min": 0,
+      "max": 32,
+      "step": 1,
+      "unit": "px",
+      "default": 0
+    }
+  ]
+}
+{% endschema %}
