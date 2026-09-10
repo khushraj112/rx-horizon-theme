@@ -24,13 +24,20 @@
   endif
 %}
 
+{%- liquid
+  # media may be a product media object or a Files media_image coming from a
+  # localized gallery slot; the latter exposes aspect_ratio on preview_image.
+  assign media_ratio = media.aspect_ratio | default: media.preview_image.aspect_ratio | default: media.image.aspect_ratio | default: 1.0
+  # A Files media_image (localized gallery slot) has no preview_image; use .image.
+  assign media_preview = media.preview_image | default: media.image
+-%}
 <div
   class="product-media"
-  style="--ratio: {{ media.aspect_ratio }}"
+  style="--ratio: {{ media_ratio }}"
   data-media-id="{{ media.id }}"
 >
   {% liquid
-    assign high_res_url = media.preview_image | image_url: width: 3840
+    assign high_res_url = media_preview | image_url: width: 3840
     assign fetch_priority = 'auto'
     if is_main_product_media
       assign fetch_priority = 'high'
@@ -38,7 +45,7 @@
     assign focal_point_style = '--focal-point: ' | append: media.presentation.focal_point | append: ';'
   %}
   {{
-    media.preview_image
+    media_preview
     | image_url: width: 3840
     | image_tag:
       widths: widths,
@@ -65,7 +72,7 @@
             on:click="/showDeferredMedia"
           >
             {{
-              media.preview_image
+              media_preview
               | image_url: width: 3840
               | image_tag:
                 widths: widths,
