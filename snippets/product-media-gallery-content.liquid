@@ -118,6 +118,105 @@
   else
     assign sorted_media = selected_product.media
   endif
+
+  # ============================================================
+  # LOCALIZED GALLERY SLOTS - DISABLED, REDO LATER
+  # ============================================================
+  # Per-variant, per-locale gallery images driven by the variant metafield
+  # custom.localized_gallery (a list of localized_gallery_slot metaobjects:
+  # Name / Position / Image / Action). Deliberately commented out for now:
+  # the gallery renders from sorted_media exactly as it did before.
+  #
+  # HOW IT WORKS
+  #   replace  slot image takes the position, the original is dropped
+  #   insert   slot image goes in front, the rest shift down
+  #   none     slot skipped, gallery untouched (per-locale off switch)
+  #   a position past the end of the gallery is appended, never dropped
+  # Positions resolve against the ORIGINAL media list, so the result does not
+  # depend on slot order. Slot values arrive already resolved to the request's
+  # locale by Shopify, so there is deliberately no locale logic here.
+  #
+  # TO REDO, three edits in this file plus one in product-media.liquid:
+  #   1. Uncomment the PLAN BUILDER below.
+  #   2. In each of the four media loops, replace the loop tag
+  #          for media in sorted_media
+  #      with
+  #          for step in gallery_plan
+  #      followed immediately by an inline liquid tag holding the STEP
+  #      RESOLVER listed at the end of this comment. The four
+  #      loops are: the slideshow slides capture, the media-gallery__grid
+  #      loop, the dialog-thumbnails-list loop, and the dialog-zoomed-gallery
+  #      loop.
+  #   3. Swap these six counts from sorted_media.size to gallery_plan.size -
+  #      without them the carousel dots undercount an inserted or appended
+  #      image and the last slide is unreachable:
+  #          is_single_column        ... sorted_media.size == 1
+  #          slideshow controls      ... if sorted_media.size > 1
+  #          slideshow-controls      ... item_count: (desktop)
+  #          slideshow-controls      ... item_count: (mobile)
+  #          slideshow               ... slide_count:
+  #          dialog thumbnails       ... if sorted_media.size > 1
+  #      Leave the two `thumbnails: sorted_media` arguments alone.
+  #   4. In snippets/product-media.liquid, restore the media_ratio /
+  #      media_preview fallbacks (see the comment in that file). A Files
+  #      media_image resolved from a metafield exposes .image, not
+  #      .preview_image or .aspect_ratio.
+  #
+  # ---- PLAN BUILDER -----------------------------------------
+  # assign loc_slots = selected_product.selected_or_first_available_variant.metafields.custom.localized_gallery.value
+  # assign gallery_plan = ''
+  # for m in sorted_media
+  #   assign pos = forloop.index
+  #   assign i0 = forloop.index0
+  #   assign replaced = false
+  #   assign si = 0
+  #   for s in loc_slots
+  #     assign act = s.action.value | downcase | strip
+  #     if s.image.value and s.position.value == pos
+  #       if act == 'insert'
+  #         assign gallery_plan = gallery_plan | append: 's' | append: si | append: ','
+  #       elsif act == 'replace'
+  #         assign gallery_plan = gallery_plan | append: 's' | append: si | append: ','
+  #         assign replaced = true
+  #       endif
+  #     endif
+  #     assign si = si | plus: 1
+  #   endfor
+  #   unless replaced
+  #     assign gallery_plan = gallery_plan | append: 'o' | append: i0 | append: ','
+  #   endunless
+  # endfor
+  # Overflow: a slot beyond the end of the gallery is appended, never dropped.
+  # assign si = 0
+  # for s in loc_slots
+  #   assign act = s.action.value | downcase | strip
+  #   if s.image.value and s.position.value > sorted_media.size
+  #     if act == 'replace' or act == 'insert'
+  #       assign gallery_plan = gallery_plan | append: 's' | append: si | append: ','
+  #     endif
+  #   endif
+  #   assign si = si | plus: 1
+  # endfor
+  # assign gallery_plan = gallery_plan | split: ','
+  #
+  # ---- STEP RESOLVER (used inside each of the four loops) ----
+  #   assign kind = step | slice: 0
+  #   assign idx = step | slice: 1, 10 | plus: 0
+  #   if kind == 'o'
+  #     assign media = sorted_media[idx]
+  #   else
+  #     assign media = nil
+  #     assign lookup_i = 0
+  #     for lookup_slot in loc_slots
+  #       if lookup_i == idx
+  #         assign media = lookup_slot.image.value
+  #       endif
+  #       assign lookup_i = lookup_i | plus: 1
+  #     endfor
+  #   endif
+  # ============================================================
+  # END LOCALIZED GALLERY SLOTS
+  # ============================================================
   assign has_image_drop = sorted_media | has: 'media_type', 'image'
 
   # Determine if we're in single column mode (carousel or grid with one column)

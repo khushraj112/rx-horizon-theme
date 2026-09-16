@@ -22,6 +22,24 @@
   if settings.transition_to_main_product
     assign ref_image_to_transition = 'imagesToTransition[]'
   endif
+
+  # ============================================================
+  # LOCALIZED GALLERY SUPPORT - DISABLED, REDO LATER
+  # ============================================================
+  # Needed only by the localized gallery slots in
+  # snippets/product-media-gallery-content.liquid (see the comment there).
+  # `media` is normally a product media object, but a slot resolves to a Files
+  # media_image, which exposes .image and has no .preview_image / .aspect_ratio.
+  #
+  # TO REDO: uncomment the two assigns below, then replace
+  #         --ratio: media.aspect_ratio   with   media_ratio
+  # and the three `media.preview_image` reads in this file with `media_preview`
+  # (the high_res_url assign, the main image_tag, and the deferred-media
+  # poster image_tag).
+  #
+  # assign media_ratio = media.aspect_ratio | default: media.preview_image.aspect_ratio | default: media.image.aspect_ratio | default: 1.0
+  # assign media_preview = media.preview_image | default: media.image
+  # ============================================================
 %}
 
 <div
