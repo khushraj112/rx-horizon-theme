@@ -118,52 +118,11 @@
   else
     assign sorted_media = selected_product.media
   endif
-  # --- Localized gallery slots -------------------------------------------
-  # Applies the selected variant's custom.localized_gallery slots to the media
-  # list. Positions resolve against the ORIGINAL list, so the result does not
-  # depend on processing order. Slot values are already locale-resolved by
-  # Shopify, so there is deliberately no locale logic here.
-  assign loc_slots = selected_product.selected_or_first_available_variant.metafields.custom.localized_gallery.value
-  assign gallery_plan = ''
-  for m in sorted_media
-    assign pos = forloop.index
-    assign i0 = forloop.index0
-    assign replaced = false
-    assign si = 0
-    for s in loc_slots
-      assign act = s.action.value | downcase | strip
-      if s.image.value and s.position.value == pos
-        if act == 'insert'
-          assign gallery_plan = gallery_plan | append: 's' | append: si | append: ','
-        elsif act == 'replace'
-          assign gallery_plan = gallery_plan | append: 's' | append: si | append: ','
-          assign replaced = true
-        endif
-      endif
-      assign si = si | plus: 1
-    endfor
-    unless replaced
-      assign gallery_plan = gallery_plan | append: 'o' | append: i0 | append: ','
-    endunless
-  endfor
-  # Overflow: a slot beyond the end of the gallery is appended, never dropped.
-  assign si = 0
-  for s in loc_slots
-    assign act = s.action.value | downcase | strip
-    if s.image.value and s.position.value > sorted_media.size
-      if act == 'replace' or act == 'insert'
-        assign gallery_plan = gallery_plan | append: 's' | append: si | append: ','
-      endif
-    endif
-    assign si = si | plus: 1
-  endfor
-  assign gallery_plan = gallery_plan | split: ','
-
   assign has_image_drop = sorted_media | has: 'media_type', 'image'
 
   # Determine if we're in single column mode (carousel or grid with one column)
   assign is_single_column = false
-  if media_presentation == 'carousel' or gallery_plan.size == 1 or media_presentation == 'grid' and block_settings.media_columns == 'one'
+  if media_presentation == 'carousel' or sorted_media.size == 1 or media_presentation == 'grid' and block_settings.media_columns == 'one'
     assign is_single_column = true
   endif
 
@@ -396,22 +355,7 @@
     {{ block_shopify_attributes }}
   >
     {% capture slides %}
-      {% for step in gallery_plan %}{%- liquid
-          assign kind = step | slice: 0
-          assign idx = step | slice: 1, 10 | plus: 0
-          if kind == 'o'
-            assign media = sorted_media[idx]
-          else
-            assign media = nil
-            assign lookup_i = 0
-            for lookup_slot in loc_slots
-              if lookup_i == idx
-                assign media = lookup_slot.image.value
-              endif
-              assign lookup_i = lookup_i | plus: 1
-            endfor
-          endif
-        -%}
+      {% for media in sorted_media %}
         {% capture children %}
           {%- liquid
               if needs_both_sizes and forloop.first
@@ -454,13 +398,13 @@
       {% endfor %}
     {% endcapture %}
 
-    {% if gallery_plan.size > 1 %}
+    {% if sorted_media.size > 1 %}
       {% capture controls %}
         {% if render_slideshow_controls %}
           {%- render 'slideshow-controls',
             class: slideshow_controls_class,
             style: slideshow_controls_style,
-            item_count: gallery_plan.size,
+            item_count: sorted_media.size,
             thumbnails: sorted_media,
             controls_on_media: controls_on_media,
             pagination_position: pagination_position,
@@ -473,7 +417,7 @@
           {%- render 'slideshow-controls',
             class: 'desktop:hidden media-gallery__mobile-controls',
             style: block_settings.slideshow_mobile_controls_style,
-            item_count: gallery_plan.size,
+            item_count: sorted_media.size,
             thumbnails: sorted_media,
             controls_on_media: mobile_controls_on_media,
             pagination_position: 'center',
@@ -494,7 +438,7 @@
       ref: 'slideshow',
       class: slideshow_class,
       slides: slides,
-      slide_count: gallery_plan.size,
+      slide_count: sorted_media.size,
       slideshow_arrows: slideshow_arrows,
       arrows_position: icons_position,
       controls: controls
@@ -505,22 +449,7 @@
         class="media-gallery__grid list-unstyled"
         data-testid="media-gallery-grid"
       >
-        {% for step in gallery_plan %}{%- liquid
-          assign kind = step | slice: 0
-          assign idx = step | slice: 1, 10 | plus: 0
-          if kind == 'o'
-            assign media = sorted_media[idx]
-          else
-            assign media = nil
-            assign lookup_i = 0
-            for lookup_slot in loc_slots
-              if lookup_i == idx
-                assign media = lookup_slot.image.value
-              endif
-              assign lookup_i = lookup_i | plus: 1
-            endfor
-          endif
-        -%}
+        {% for media in sorted_media %}
           <li
             ref="media[]"
             class="{{ product_media_container_class }} product-media-container--{{ media.media_type }} {% unless block_settings.aspect_ratio == 'adapt' %}product-media-container--force-aspect{% endunless %}"
@@ -588,23 +517,8 @@
               class="dialog-thumbnails-list list-unstyled"
               ref="thumbnails"
             >
-              {% if gallery_plan.size > 1 %}
-                {%- for step in gallery_plan -%}{%- liquid
-          assign kind = step | slice: 0
-          assign idx = step | slice: 1, 10 | plus: 0
-          if kind == 'o'
-            assign media = sorted_media[idx]
-          else
-            assign media = nil
-            assign lookup_i = 0
-            for lookup_slot in loc_slots
-              if lookup_i == idx
-                assign media = lookup_slot.image.value
-              endif
-              assign lookup_i = lookup_i | plus: 1
-            endfor
-          endif
-        -%}
+              {% if sorted_media.size > 1 %}
+                {%- for media in sorted_media -%}
                   {% liquid
                     assign aspect_ratio = block_settings.aspect_ratio
                     if block_settings.aspect_ratio == 'adapt'
@@ -647,22 +561,7 @@
           <ul
             class="dialog-zoomed-gallery list-unstyled"
           >
-            {%- for step in gallery_plan -%}{%- liquid
-          assign kind = step | slice: 0
-          assign idx = step | slice: 1, 10 | plus: 0
-          if kind == 'o'
-            assign media = sorted_media[idx]
-          else
-            assign media = nil
-            assign lookup_i = 0
-            for lookup_slot in loc_slots
-              if lookup_i == idx
-                assign media = lookup_slot.image.value
-              endif
-              assign lookup_i = lookup_i | plus: 1
-            endfor
-          endif
-        -%}
+            {%- for media in sorted_media -%}
               <li
                 id="product-{{ media.id}}-{{ forloop.index }}"
                 class="{{ product_media_container_class | remove: 'media-fit-cover' }} product-media-container--{{ media.media_type }}{% if media.media_type == 'image' %} product-media-container--zoomable{% endif %}"
