@@ -120,8 +120,13 @@
   endif
 
   # ============================================================
-  # LOCALIZED GALLERY SLOTS - DISABLED, REDO LATER
+  # OLD: metaobject localized_gallery approach, kept for rollback
   # ============================================================
+  # SUPERSEDED by the ALT TEXT MODEL further down. Kept commented, not
+  # deleted, so the whole approach is one uncomment away. The variant
+  # metafield data is still on the variants and is inert while this is
+  # commented out, so a rollback springs straight back to life.
+  #
   # Per-variant, per-locale gallery images driven by the variant metafield
   # custom.localized_gallery (a list of localized_gallery_slot metaobjects:
   # Name / Position / Image / Action). Deliberately commented out for now:
@@ -136,27 +141,35 @@
   # depend on slot order. Slot values arrive already resolved to the request's
   # locale by Shopify, so there is deliberately no locale logic here.
   #
-  # TO REDO, three edits in this file plus one in product-media.liquid:
-  #   1. Uncomment the PLAN BUILDER below.
+  # TO ROLL BACK TO THIS, three edits in this file plus one in
+  # product-media.liquid. Every consumer below now reads gallery_media, which
+  # the ALT TEXT MODEL produces, so the rollback is a straight swap:
+  #   1. Delete (or comment out) the ALT TEXT MODEL block, then uncomment the
+  #      PLAN BUILDER below.
   #   2. In each of the four media loops, replace the loop tag
-  #          for media in sorted_media
+  #          for media in gallery_media
   #      with
   #          for step in gallery_plan
   #      followed immediately by an inline liquid tag holding the STEP
   #      RESOLVER listed at the end of this comment. The four
   #      loops are: the slideshow slides capture, the media-gallery__grid
   #      loop, the dialog-thumbnails-list loop, and the dialog-zoomed-gallery
-  #      loop.
-  #   3. Swap these six counts from sorted_media.size to gallery_plan.size -
+  #      loop. The fifth loop, the lowest_aspect_ratio scan, must stay in step
+  #      with the slides loop or the tallest-image index points at the wrong
+  #      slide.
+  #   3. Swap these counts from gallery_media.size to gallery_plan.size -
   #      without them the carousel dots undercount an inserted or appended
   #      image and the last slide is unreachable:
-  #          is_single_column        ... sorted_media.size == 1
-  #          slideshow controls      ... if sorted_media.size > 1
+  #          has_image_drop          ... gallery_media | has:
+  #          is_single_column        ... gallery_media.size == 1
+  #          slideshow controls      ... if gallery_media.size > 1
   #          slideshow-controls      ... item_count: (desktop)
   #          slideshow-controls      ... item_count: (mobile)
   #          slideshow               ... slide_count:
-  #          dialog thumbnails       ... if sorted_media.size > 1
-  #      Leave the two `thumbnails: sorted_media` arguments alone.
+  #          dialog thumbnails       ... if gallery_media.size > 1
+  #      Point the two `thumbnails: gallery_media` arguments back at
+  #      sorted_media - under the plan model the slot images are not product
+  #      media, so they cannot be passed through as thumbnails.
   #   4. In snippets/product-media.liquid, restore the media_ratio /
   #      media_preview fallbacks (see the comment in that file). A Files
   #      media_image resolved from a metafield exposes .image, not
@@ -215,13 +228,328 @@
   #     endfor
   #   endif
   # ============================================================
-  # END LOCALIZED GALLERY SLOTS
+  # END OLD: metaobject localized_gallery approach
   # ============================================================
-  assign has_image_drop = sorted_media | has: 'media_type', 'image'
+
+  # ============================================================
+  # LOCALIZED GALLERY - ALT TEXT MODEL (live)
+  # ============================================================
+  # Nothing is stored in a metafield. Every image lives in the normal product
+  # gallery and is classified by its ALT TEXT. Shopify does not translate alt
+  # text - Translate & Adapt offers no field for it and the storefront returns
+  # a byte-identical string on every locale - so the alt text is a stable
+  # global key.
+  #
+  #   <description> [|| <Colour>] [|| <lang>]
+  #
+  #   "Beanie front"                   base "Beanie front"             colour -     lang -
+  #   "Colour hero || Charcoal"        base "Colour hero || Charcoal"  colour yes   lang -
+  #   "Colour hero || Charcoal || de"  base "Colour hero || Charcoal"  colour yes   lang de
+  #   "Size guide || de"               base "Size guide"               colour -     lang de
+  #
+  # lang is the LAST segment, and only when it matches an enabled shop locale,
+  # so a trailing "Rust" or "Kids" is never mistaken for a language. base is
+  # the alt text with the language segment removed - that is the twin key.
+  # colour is the last segment of base, and only when it matches one of the
+  # product's colour values.
+  #
+  # THE RULE, walked over sorted_media in order:
+  #   1. COLOUR - a colour that is not the selected variant's colour drops the
+  #      image. An image with no colour is shared and always survives.
+  #   2. LANGUAGE - a language that is not the request locale drops the image.
+  #      A match renders in the position of its lang-less twin (and drops that
+  #      twin), or in its own position when no twin exists. A lang-less image
+  #      renders normally unless a twin replaced it.
+  # "Replace" and "insert" therefore fall out of whether a base twin exists;
+  # there is no Action field and no Position field to keep in step.
+  #
+  # Alt text with no || segments parses to a base and nothing else: no colour,
+  # no language, nothing dropped or moved. An untagged product renders exactly
+  # as it did before this block existed.
+  #
+  # The result is gallery_media, a real media array that replaces sorted_media
+  # in every loop and every count below. Horizon re-renders this section on
+  # variant:update, so the swatch switch stays instant with no custom JS.
+
+  # THE LOCALE ALLOWLIST. Only a code listed here is read as a language
+  # segment, so a trailing "Rust" or "Kids" is never mistaken for one.
+  #
+  # It has to be spelled out. Liquid cannot discover the shop's languages:
+  # both shop.published_locales and localization.available_languages are
+  # scoped to the CURRENT market, and on this shop they return just "en" on
+  # the US market even though de and fr are live on their own markets. A
+  # language missing from this list is invisible to the filter, so its images
+  # would leak into every locale as untagged ones.
+  #
+  # ADD A CODE HERE WHENEVER A LANGUAGE IS ADDED TO THE SHOP.
+  assign gallery_extra_locales = 'de,fr'
+
+  assign gallery_lang_vocab = ''
+  assign gallery_locale_list = gallery_extra_locales | split: ','
+  for gallery_locale in gallery_locale_list
+    assign gallery_iso = gallery_locale | downcase | strip
+    assign gallery_lookup = '[[' | append: gallery_iso | append: ']]'
+    if gallery_iso != blank
+      unless gallery_lang_vocab contains gallery_lookup
+        assign gallery_lang_vocab = gallery_lang_vocab | append: gallery_lookup
+      endunless
+    endif
+  endfor
+  # Unioned with whatever the current market does report, so a language that
+  # is live on this market is picked up even if it is missing from the list.
+  for gallery_locale in shop.published_locales
+    assign gallery_iso = gallery_locale.iso_code | downcase | strip
+    assign gallery_lookup = '[[' | append: gallery_iso | append: ']]'
+    unless gallery_lang_vocab contains gallery_lookup
+      assign gallery_lang_vocab = gallery_lang_vocab | append: gallery_lookup
+    endunless
+  endfor
+  for gallery_locale in localization.available_languages
+    assign gallery_iso = gallery_locale.iso_code | downcase | strip
+    assign gallery_lookup = '[[' | append: gallery_iso | append: ']]'
+    unless gallery_lang_vocab contains gallery_lookup
+      assign gallery_lang_vocab = gallery_lang_vocab | append: gallery_lookup
+    endunless
+  endfor
+  assign gallery_current_lang = localization.language.iso_code | downcase | strip
+
+  # Colour vocabulary, seeded from the variants' own featured images: their alt
+  # text is the only colour naming guaranteed identical on every locale. Read
+  # from the variants rather than from sorted_media because hide_variants can
+  # keep some of those images out of the gallery list.
+  assign gallery_colour_vocab = ''
+  for gallery_variant in selected_product.variants
+    assign gallery_alt = gallery_variant.featured_media.alt
+    if gallery_alt == blank
+      continue
+    endif
+    assign gallery_segments = gallery_alt | split: '||'
+    assign gallery_base_count = gallery_segments.size
+    if gallery_base_count > 1
+      assign gallery_last_index = gallery_base_count | minus: 1
+      assign gallery_lang_candidate = gallery_segments[gallery_last_index] | strip | downcase
+      assign gallery_lookup = '[[' | append: gallery_lang_candidate | append: ']]'
+      if gallery_lang_candidate != blank and gallery_lang_vocab contains gallery_lookup
+        assign gallery_base_count = gallery_last_index
+      endif
+    endif
+    # A colour is an ADDITIONAL segment, never the description itself, so a
+    # one-segment base has no colour. Without this an untagged product whose
+    # variants carry featured images would read each alt as a colour and hide
+    # every other variant's image.
+    if gallery_base_count > 1
+      assign gallery_last_index = gallery_base_count | minus: 1
+      assign gallery_colour = gallery_segments[gallery_last_index] | strip | upcase
+      assign gallery_lookup = '[[' | append: gallery_colour | append: ']]'
+      if gallery_colour != blank
+        unless gallery_colour_vocab contains gallery_lookup
+          assign gallery_colour_vocab = gallery_colour_vocab | append: gallery_lookup
+        endunless
+      endif
+    endif
+  endfor
+
+  # Widen the vocabulary to the whole option the variant colours belong to, so
+  # a colour with no variant of its own is still recognised as a colour. The
+  # option is found by intersection rather than by name, so a translated option
+  # name cannot break it; if the option VALUES are translated the intersection
+  # is simply empty and the variant-derived vocabulary above still stands.
+  for gallery_option in selected_product.options_with_values
+    assign gallery_option_matches = false
+    for gallery_option_value in gallery_option.values
+      assign gallery_colour = gallery_option_value | strip | upcase
+      assign gallery_lookup = '[[' | append: gallery_colour | append: ']]'
+      if gallery_colour_vocab contains gallery_lookup
+        assign gallery_option_matches = true
+        break
+      endif
+    endfor
+    if gallery_option_matches
+      for gallery_option_value in gallery_option.values
+        assign gallery_colour = gallery_option_value | strip | upcase
+        assign gallery_lookup = '[[' | append: gallery_colour | append: ']]'
+        if gallery_colour != blank
+          unless gallery_colour_vocab contains gallery_lookup
+            assign gallery_colour_vocab = gallery_colour_vocab | append: gallery_lookup
+          endunless
+        endif
+      endfor
+    endif
+  endfor
+
+  # Parse every gallery image once. Liquid cannot build an indexable array of
+  # values, so the three results are kept as delimited strings and split back
+  # into arrays; each entry carries an 'x' prefix so that an empty value still
+  # occupies a slot instead of being swallowed by split.
+  assign gallery_sep = '|#|'
+  assign gallery_bases = ''
+  assign gallery_langs = ''
+  assign gallery_colours = ''
+
+  for media in sorted_media
+    assign gallery_segments = media.alt | split: '||'
+    assign gallery_base_count = gallery_segments.size
+    assign gallery_media_lang = ''
+
+    if gallery_base_count > 1
+      assign gallery_last_index = gallery_base_count | minus: 1
+      assign gallery_lang_candidate = gallery_segments[gallery_last_index] | strip | downcase
+      assign gallery_lookup = '[[' | append: gallery_lang_candidate | append: ']]'
+      if gallery_lang_candidate != blank and gallery_lang_vocab contains gallery_lookup
+        assign gallery_media_lang = gallery_lang_candidate
+        assign gallery_base_count = gallery_last_index
+      endif
+    endif
+
+    # base is rebuilt from the trimmed segments so that spacing around || can
+    # never break a twin match; its last segment is the colour candidate.
+    assign gallery_media_base = ''
+    assign gallery_colour = ''
+    for gallery_segment_index in (1..gallery_base_count)
+      assign gallery_segment = gallery_segments[forloop.index0] | strip | upcase
+      if forloop.first
+        assign gallery_media_base = gallery_segment
+      else
+        assign gallery_media_base = gallery_media_base | append: '||' | append: gallery_segment
+      endif
+      assign gallery_colour = gallery_segment
+    endfor
+
+    # Same rule as above: the description alone is never a colour.
+    if gallery_base_count < 2
+      assign gallery_colour = ''
+    endif
+
+    assign gallery_lookup = '[[' | append: gallery_colour | append: ']]'
+    unless gallery_colour != blank and gallery_colour_vocab contains gallery_lookup
+      assign gallery_colour = ''
+    endunless
+
+    assign gallery_bases = gallery_bases | append: 'x' | append: gallery_media_base | append: gallery_sep
+    assign gallery_langs = gallery_langs | append: 'x' | append: gallery_media_lang | append: gallery_sep
+    assign gallery_colours = gallery_colours | append: 'x' | append: gallery_colour | append: gallery_sep
+  endfor
+
+  assign gallery_bases = gallery_bases | split: gallery_sep
+  assign gallery_langs = gallery_langs | split: gallery_sep
+  assign gallery_colours = gallery_colours | split: gallery_sep
+
+  # The selected colour comes from the variant's own featured image, which
+  # sorted_media always puts first, so it is the same token on every locale.
+  assign gallery_selected_colour = ''
+  if selected_variant_media and gallery_colours.size > 0
+    assign gallery_selected_colour = gallery_colours[0] | slice: 1, 9999
+  endif
+
+  # Walk the gallery and record, as indexes into sorted_media, what survives.
+  assign gallery_plan = ''
+  for media in sorted_media
+    assign gallery_index = forloop.index0
+    assign gallery_media_base = gallery_bases[gallery_index] | slice: 1, 9999
+    assign gallery_media_lang = gallery_langs[gallery_index] | slice: 1, 9999
+    assign gallery_colour = gallery_colours[gallery_index] | slice: 1, 9999
+
+    # 1. COLOUR - shared images have no colour and always pass.
+    if gallery_colour != blank and gallery_colour != gallery_selected_colour
+      continue
+    endif
+
+    # 2. LANGUAGE
+    if gallery_media_lang != blank and gallery_media_lang != gallery_current_lang
+      continue
+    endif
+
+    if gallery_media_base == blank
+      assign gallery_plan = gallery_plan | append: gallery_index | append: ','
+      continue
+    endif
+
+    if gallery_media_lang == blank
+      # A twin for the request locale takes this image's position.
+      assign gallery_twin_index = -1
+      for gallery_twin in sorted_media
+        assign gallery_candidate_index = forloop.index0
+        assign gallery_candidate_lang = gallery_langs[gallery_candidate_index] | slice: 1, 9999
+        if gallery_candidate_lang != gallery_current_lang
+          continue
+        endif
+        assign gallery_candidate_base = gallery_bases[gallery_candidate_index] | slice: 1, 9999
+        if gallery_candidate_base == gallery_media_base
+          assign gallery_twin_index = gallery_candidate_index
+          break
+        endif
+      endfor
+      if gallery_twin_index >= 0
+        assign gallery_plan = gallery_plan | append: gallery_twin_index | append: ','
+      else
+        assign gallery_plan = gallery_plan | append: gallery_index | append: ','
+      endif
+    else
+      # This IS the localized twin. It only renders in its own position when
+      # there is no base image for it to replace.
+      assign gallery_has_base_twin = false
+      for gallery_twin in sorted_media
+        assign gallery_candidate_index = forloop.index0
+        assign gallery_candidate_lang = gallery_langs[gallery_candidate_index] | slice: 1, 9999
+        if gallery_candidate_lang != blank
+          continue
+        endif
+        assign gallery_candidate_base = gallery_bases[gallery_candidate_index] | slice: 1, 9999
+        if gallery_candidate_base == gallery_media_base
+          assign gallery_has_base_twin = true
+          break
+        endif
+      endfor
+      unless gallery_has_base_twin
+        assign gallery_plan = gallery_plan | append: gallery_index | append: ','
+      endunless
+    endif
+  endfor
+  assign gallery_plan = gallery_plan | split: ','
+
+  # Resolve the plan into a real media array, so every loop and every count
+  # below simply reads gallery_media and needs no step resolver.
+  assign gallery_media = '' | split: ','
+  for gallery_step in gallery_plan
+    assign gallery_index = gallery_step | plus: 0
+    assign gallery_step_media = sorted_media[gallery_index]
+    assign found_media = sorted_media | where: 'id', gallery_step_media.id
+    assign gallery_media = gallery_media | concat: found_media
+  endfor
+
+  # Safety net: an empty gallery is a broken page, so a product whose images
+  # are all tagged for some other colour falls back to the unfiltered list.
+  if gallery_media.size == 0
+    assign gallery_media = sorted_media
+  endif
+
+  # The slideshow controls above were sized against the unfiltered gallery.
+  # Re-derive the two counts that would otherwise be wrong, but only when the
+  # filter actually removed something, so an untagged product stays identical.
+  if gallery_media.size != sorted_media.size
+    assign slideshow_controls_style = block_settings.slideshow_controls_style
+    if slideshow_controls_style == 'dots' and gallery_media.size > 15
+      assign slideshow_controls_style = 'counter'
+    endif
+
+    assign render_slideshow_arrows = false
+    if gallery_media.size <= 1
+      assign slideshow_class = 'product-media-gallery__slideshow--single-media slideshow--single-media'
+    else
+      assign slideshow_class = ''
+      if media_presentation == 'carousel'
+        assign render_slideshow_arrows = true
+      endif
+    endif
+  endif
+  # ============================================================
+  # END LOCALIZED GALLERY - ALT TEXT MODEL
+  # ============================================================
+  assign has_image_drop = gallery_media | has: 'media_type', 'image'
 
   # Determine if we're in single column mode (carousel or grid with one column)
   assign is_single_column = false
-  if media_presentation == 'carousel' or sorted_media.size == 1 or media_presentation == 'grid' and block_settings.media_columns == 'one'
+  if media_presentation == 'carousel' or gallery_media.size == 1 or media_presentation == 'grid' and block_settings.media_columns == 'one'
     assign is_single_column = true
   endif
 
@@ -262,7 +590,7 @@
     assign lowest_aspect_ratio = 50
     assign lowest_aspect_ratio_index = 0
 
-    for media in sorted_media
+    for media in gallery_media
       # Find the media with the lowest aspect ratio (tallest)
 
       if media.preview_image and media.preview_image.aspect_ratio
@@ -454,7 +782,7 @@
     {{ block_shopify_attributes }}
   >
     {% capture slides %}
-      {% for media in sorted_media %}
+      {% for media in gallery_media %}
         {% capture children %}
           {%- liquid
               if needs_both_sizes and forloop.first
@@ -497,14 +825,14 @@
       {% endfor %}
     {% endcapture %}
 
-    {% if sorted_media.size > 1 %}
+    {% if gallery_media.size > 1 %}
       {% capture controls %}
         {% if render_slideshow_controls %}
           {%- render 'slideshow-controls',
             class: slideshow_controls_class,
             style: slideshow_controls_style,
-            item_count: sorted_media.size,
-            thumbnails: sorted_media,
+            item_count: gallery_media.size,
+            thumbnails: gallery_media,
             controls_on_media: controls_on_media,
             pagination_position: pagination_position,
             aspect_ratio: block_settings.aspect_ratio,
@@ -516,8 +844,8 @@
           {%- render 'slideshow-controls',
             class: 'desktop:hidden media-gallery__mobile-controls',
             style: block_settings.slideshow_mobile_controls_style,
-            item_count: sorted_media.size,
-            thumbnails: sorted_media,
+            item_count: gallery_media.size,
+            thumbnails: gallery_media,
             controls_on_media: mobile_controls_on_media,
             pagination_position: 'center',
             aspect_ratio: block_settings.aspect_ratio,
@@ -537,7 +865,7 @@
       ref: 'slideshow',
       class: slideshow_class,
       slides: slides,
-      slide_count: sorted_media.size,
+      slide_count: gallery_media.size,
       slideshow_arrows: slideshow_arrows,
       arrows_position: icons_position,
       controls: controls
@@ -548,7 +876,7 @@
         class="media-gallery__grid list-unstyled"
         data-testid="media-gallery-grid"
       >
-        {% for media in sorted_media %}
+        {% for media in gallery_media %}
           <li
             ref="media[]"
             class="{{ product_media_container_class }} product-media-container--{{ media.media_type }} {% unless block_settings.aspect_ratio == 'adapt' %}product-media-container--force-aspect{% endunless %}"
@@ -616,8 +944,8 @@
               class="dialog-thumbnails-list list-unstyled"
               ref="thumbnails"
             >
-              {% if sorted_media.size > 1 %}
-                {%- for media in sorted_media -%}
+              {% if gallery_media.size > 1 %}
+                {%- for media in gallery_media -%}
                   {% liquid
                     assign aspect_ratio = block_settings.aspect_ratio
                     if block_settings.aspect_ratio == 'adapt'
@@ -660,7 +988,7 @@
           <ul
             class="dialog-zoomed-gallery list-unstyled"
           >
-            {%- for media in sorted_media -%}
+            {%- for media in gallery_media -%}
               <li
                 id="product-{{ media.id}}-{{ forloop.index }}"
                 class="{{ product_media_container_class | remove: 'media-fit-cover' }} product-media-container--{{ media.media_type }}{% if media.media_type == 'image' %} product-media-container--zoomable{% endif %}"
