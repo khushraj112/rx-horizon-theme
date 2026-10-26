@@ -26,6 +26,24 @@
   if product.variants_count == 1 or product.options.size == 1 and product.selected_variant
     assign quick_add_button = 'add'
   endif
+
+  # Rx gate: same rules as blocks/buy-buttons.liquid. The "Choose" button opens the
+  # quick add modal, which renders buy-buttons and is gated there.
+  assign rx_required = false
+  if product.tags contains 'doctor-only'
+    assign rx_customer_tags_norm = customer.tags | join: '|' | downcase
+    unless rx_customer_tags_norm contains 'doctor-only' or rx_customer_tags_norm contains 'rx-review-approved-auto'
+      assign rx_required = true
+    endunless
+    assign rx_state = 'verify'
+    if customer == nil
+      assign rx_state = 'guest'
+    elsif rx_customer_tags_norm contains 'rx-review-rejected'
+      assign rx_state = 'verify'
+    elsif rx_customer_tags_norm contains 'rx-review-pending'
+      assign rx_state = 'review'
+    endif
+  endif
 %}
 
 <quick-add-component
@@ -74,13 +92,25 @@
             - There is only one product option, and it is displayed as swatches on the product card, and no swatch is selected
             - There is more than one product option
       {% endcomment %}
-      {% render 'add-to-cart-button',
-        add_to_cart_text: add_to_cart_text,
-        class: 'button quick-add__button quick-add__button--add add-to-cart-button',
-        can_add_to_cart: can_add_to_cart,
-        icon_only_on_mobile: true,
-        product: product
-      %}
+      <span
+        class="rx-atc"
+        style="display: contents;"
+        data-rx-atc
+        {%- if rx_required %}
+          data-rx-required="true"
+          data-rx-state="{{ rx_state }}"
+          data-rx-verify-url="/pages/rx-apply?return_url={{ product.url | url_encode }}"
+          data-rx-login-url="{{ routes.account_login_url }}?return_url=/pages/rx-apply"
+        {% endif -%}
+      >
+        {% render 'add-to-cart-button',
+          add_to_cart_text: add_to_cart_text,
+          class: 'button quick-add__button quick-add__button--add add-to-cart-button',
+          can_add_to_cart: can_add_to_cart,
+          icon_only_on_mobile: true,
+          product: product
+        %}
+      </span>
 
       <button
         class="button quick-add__button quick-add__button--choose add-to-cart-button"

@@ -1,0 +1,268 @@
+{% comment %}
+  =============================================================================
+  rx-verify-modal.liquid
+  Click-intercept popup for gated ('doctor-only') products. Ported from Mountainside.
+  Rendered ONCE per page (from layout/theme.liquid), hidden by default.
+
+  The Add to cart buttons stay fully visible. When a product is gated and the
+  customer is NOT allowed, the button's wrapper (blocks/buy-buttons.liquid,
+  snippets/quick-add.liquid) carries data-rx-required="true" plus data-rx-state /
+  data-rx-*-url. The click interceptor below opens this popup instead of adding
+  to cart.
+
+  Content is keyed by state: guest | verify | review.
+  =============================================================================
+{% endcomment %}
+
+<div class="rx-modal" data-rx-modal hidden>
+  <div class="rx-modal__backdrop" data-rx-modal-backdrop tabindex="-1"></div>
+  <div
+    class="rx-modal__dialog"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="rx-modal-title"
+    aria-describedby="rx-modal-text"
+    data-rx-modal-dialog
+  >
+    <button type="button" class="rx-modal__close" data-rx-modal-close aria-label="Close">&times;</button>
+    <div class="rx-modal__head">
+      <span class="rx-modal__icon" data-rx-modal-icon aria-hidden="true">🔒</span>
+      <h2 class="rx-modal__title" id="rx-modal-title" data-rx-modal-title>Prescription verification required</h2>
+    </div>
+    <p class="rx-modal__text" id="rx-modal-text" data-rx-modal-text></p>
+    <a class="rx-modal__btn" data-rx-modal-action hidden></a>
+  </div>
+</div>
+
+<script>
+  (function () {
+    var RX_CONTENT = {
+      verify: {
+        icon: '🔒',
+        title: 'Prescription verification required',
+        text: 'This product requires a valid prescription license. Verify once and you can purchase Rx items.',
+        action: { label: 'Verify your license →', urlKey: 'verifyUrl' }
+      },
+      guest: {
+        icon: '🔒',
+        title: 'Please log in',
+        text: 'Log in, then verify your prescription license to purchase.',
+        action: { label: 'Log in', urlKey: 'loginUrl' }
+      },
+      review: {
+        icon: '🔎',
+        title: 'Under manual review',
+        text: "We've received your documents and will email you once the review is complete.",
+        action: null
+      }
+      // No 'pending' state: 'rx-pending' (automation still running) is ignored on the
+      // product side. Customers stay on the form-page loading screen until a result tag
+      // lands, so the modal only ever sees verify / guest / review / verified.
+    };
+
+    var modal = document.querySelector('[data-rx-modal]');
+    if (!modal) return;
+    // Portal the modal to <body> so it always overlays the whole viewport:
+    //  (1) escapes any ancestor with transform/filter/will-change (which would otherwise
+    //      trap position:fixed inside a section and make it take/steal layout space), and
+    //  (2) places it last in the DOM so, at the max z-index below, it wins over every
+    //      other overlay (cart drawer, notification bars, third-party apps).
+    if (modal.parentNode !== document.body) document.body.appendChild(modal);
+    var dialog = modal.querySelector('[data-rx-modal-dialog]');
+    var iconEl = modal.querySelector('[data-rx-modal-icon]');
+    var titleEl = modal.querySelector('[data-rx-modal-title]');
+    var textEl = modal.querySelector('[data-rx-modal-text]');
+    var actionEl = modal.querySelector('[data-rx-modal-action]');
+    var closeBtn = modal.querySelector('[data-rx-modal-close]');
+    var backdrop = modal.querySelector('[data-rx-modal-backdrop]');
+
+    var lastFocused = null;
+    var pollTimer = null;
+    var pollTries = 0;
+
+    function focusable() {
+      return Array.prototype.slice.call(
+        dialog.querySelectorAll('a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])')
+      ).filter(function (el) { return !el.hasAttribute('hidden') && el.offsetParent !== null; });
+    }
+
+    function onKeydown(e) {
+      if (e.key === 'Escape' || e.key === 'Esc') { close(); return; }
+      if (e.key !== 'Tab') return;
+      var items = focusable();
+      if (!items.length) { e.preventDefault(); return; }
+      var first = items[0], last = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault(); last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault(); first.focus();
+      }
+    }
+
+    // Optional server-truth poll: while pending/review, re-fetch this page and
+    // reload when the buy button is no longer rx-required (customer became allowed).
+    function startPoll() {
+      stopPoll();
+      pollTries = 0;
+      pollTimer = setInterval(function () {
+        pollTries++;
+        if (pollTries > 12) { stopPoll(); return; }
+        var url = window.location.pathname + (window.location.search ? window.location.search + '&' : '?') + 'rxpoll=' + pollTries;
+        fetch(url, { credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' } })
+          .then(function (r) { return r.text(); })
+          .then(function (html) {
+            var doc = new DOMParser().parseFromString(html, 'text/html');
+            var btn = doc.querySelector('[data-rx-atc]');
+            if (btn && btn.getAttribute('data-rx-required') !== 'true') {
+              window.location.reload();
+            }
+          })
+          .catch(function () {});
+      }, 5000);
+    }
+    function stopPoll() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
+
+    function open(detail) {
+      detail = detail || {};
+      var state = detail.state || 'verify';
+      var content = RX_CONTENT[state] || RX_CONTENT.verify;
+
+      iconEl.textContent = content.icon;
+      titleEl.textContent = content.title;
+      textEl.textContent = content.text;
+
+      if (content.action) {
+        actionEl.textContent = content.action.label;
+        if (content.action.reload) {
+          actionEl.setAttribute('href', '#');
+          actionEl.onclick = function (e) { e.preventDefault(); window.location.reload(); };
+        } else {
+          actionEl.setAttribute('href', detail[content.action.urlKey] || '#');
+          actionEl.onclick = null;
+        }
+        actionEl.hidden = false;
+      } else {
+        actionEl.hidden = true;
+        actionEl.onclick = null;
+      }
+
+      modal.classList.add('rx-modal--' + state);
+      lastFocused = document.activeElement;
+      modal.hidden = false;
+      // NOTE: intentionally NOT locking body scroll. Setting body{overflow:hidden}
+      // strips the scroll context that the theme's position:sticky product columns
+      // (.product-gallery / .product-main) depend on, which makes them snap downward.
+      // The fixed, max-z-index backdrop already blocks all interaction with the page.
+      document.addEventListener('keydown', onKeydown, true);
+      (focusable()[0] || closeBtn).focus();
+
+      if (state === 'review') startPoll();
+    }
+
+    function close() {
+      stopPoll();
+      modal.hidden = true;
+      document.removeEventListener('keydown', onKeydown, true);
+      modal.className = 'rx-modal';
+      if (lastFocused && typeof lastFocused.focus === 'function') lastFocused.focus();
+    }
+
+    closeBtn.addEventListener('click', close);
+    backdrop.addEventListener('click', close);
+
+    // Click interceptor for gated Add to cart buttons. Their wrapper ([data-rx-atc])
+    // carries data-rx-required="true" + data-rx-state / data-rx-verify-url /
+    // data-rx-login-url when the customer is NOT allowed. We open the verification popup
+    // instead of adding to cart. Uses the CAPTURE phase + stopImmediatePropagation so this
+    // fires BEFORE Horizon's bubbling on:click / on:submit delegation in component.js, and
+    // preventDefault stops the form submit. Allowed customers never have data-rx-required,
+    // so this is a no-op for them.
+    document.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-rx-required="true"]');
+      if (!btn) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      open({
+        state: btn.getAttribute('data-rx-state') || 'verify',
+        verifyUrl: btn.getAttribute('data-rx-verify-url') || '',
+        loginUrl: btn.getAttribute('data-rx-login-url') || ''
+      });
+    }, true);
+
+    window.RxVerifyModal = { open: open, close: close };
+  })();
+</script>
+
+<style>
+  .rx-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 2147483647; /* max 32-bit z-index — sits above every other overlay; DOM order (portaled last to body) breaks ties */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .rx-modal[hidden] { display: none; }
+  .rx-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(20, 40, 28, 0.55);
+  }
+  .rx-modal__dialog {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 360px;
+    background: #fff;
+    border-radius: 14px;
+    padding: 18px 20px 20px;
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
+    border-top: 4px solid #2d5a3d;
+  }
+  .rx-modal__close {
+    position: absolute;
+    top: 8px;
+    right: 12px;
+    border: none;
+    background: none;
+    font-size: 22px;
+    line-height: 1;
+    color: #9aa39c;
+    cursor: pointer;
+  }
+  .rx-modal__close:hover { color: #333; }
+  .rx-modal__head { display: flex; align-items: center; gap: 9px; margin: 0 24px 6px 0; }
+  .rx-modal__icon { flex: none; font-size: 20px; line-height: 1; }
+  .rx-modal__title { margin: 0; font-size: 16px; font-weight: 700; color: #1e3a28; text-wrap: balance; }
+  .rx-modal__text { margin: 0 0 14px; font-size: 13px; line-height: 1.45; color: #55635b; }
+  .rx-modal__btn {
+    display: flex;
+    width: fit-content;
+    margin: 2px auto 0;
+    align-items: center;
+    justify-content: center;
+    padding: 9px 16px;
+    background-color: #2d5a3d;
+    color: #fff;
+    font-size: 13.5px;
+    font-weight: 700;
+    text-decoration: none;
+    border-radius: 7px;
+    transition: background-color 0.2s ease;
+  }
+  .rx-modal__btn[hidden] { display: none; }
+  .rx-modal__btn:hover { background-color: #1e4a2d; color: #fff; }
+
+  {%- comment -%} State accents — match the product-page rx-pill palette (info / warn / stop). {%- endcomment -%}
+  .rx-modal--guest .rx-modal__dialog { border-top-color: #3b6fb0; }
+  .rx-modal--guest .rx-modal__title { color: #274a78; }
+  .rx-modal--guest .rx-modal__btn { background-color: #3b6fb0; }
+  .rx-modal--guest .rx-modal__btn:hover { background-color: #2f5a91; }
+  .rx-modal--review .rx-modal__dialog { border-top-color: #c08a12; }
+  .rx-modal--review .rx-modal__title { color: #6b4e07; }
+  .rx-modal--pending .rx-modal__dialog { border-top-color: #c08a12; }
+  .rx-modal--pending .rx-modal__title { color: #6b4e07; }
+  .rx-modal--verify .rx-modal__dialog { border-top-color: #c0392b; }
+  .rx-modal--verify .rx-modal__title { color: #7a241b; }
+</style>

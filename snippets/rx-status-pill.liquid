@@ -1,0 +1,76 @@
+{% comment %}
+  Rx status pill — GATED ('doctor-only') products only.
+
+  A compact chip that tells the customer where they stand with licence
+  verification. The buy button is never suppressed (see blocks/buy-buttons.liquid);
+  this is purely an additive status indicator. Ported from Mountainside.
+
+  Rendered from blocks/buy-buttons.liquid, above the Add to cart button.
+
+  State logic mirrors blocks/buy-buttons.liquid:
+    allowed  -> customer tagged doctor-only / rx-review-approved-auto
+    guest    -> logged out
+    review   -> rx-review-pending (manual review)
+    verify   -> everyone else (incl. rx-review-rejected)
+
+  KEEP IN SYNC: the PILL map in snippets/rx-fresh-state.liquid mirrors this
+  markup (it swaps the pill in place after a verification round-trip).
+{% endcomment %}
+{%- assign rxp_gated = false -%}
+{%- if product.tags contains 'doctor-only' -%}
+  {%- assign rxp_gated = true -%}
+{%- endif -%}
+
+{%- if rxp_gated -%}
+  {%- assign rxp_tags = customer.tags | join: '|' | downcase -%}
+  {%- assign rxp_allowed = false -%}
+  {%- if rxp_tags contains 'doctor-only' or rxp_tags contains 'rx-review-approved-auto' -%}
+    {%- assign rxp_allowed = true -%}
+  {%- endif -%}
+  {%- assign rxp_state = 'verify' -%}
+  {%- if customer == nil -%}
+    {%- assign rxp_state = 'guest' -%}
+  {%- elsif rxp_tags contains 'rx-review-rejected' -%}
+    {%- assign rxp_state = 'verify' -%}
+  {%- elsif rxp_tags contains 'rx-review-pending' -%}
+    {%- assign rxp_state = 'review' -%}
+  {%- endif -%}
+
+  {%- unless rx_pill_css_rendered -%}
+    {%- assign rx_pill_css_rendered = true -%}
+    <style>
+      .rx-pill{display:inline-flex;align-items:center;gap:7px;max-width:100%;padding:6px 13px 6px 11px;border:1px solid;border-radius:999px;font-size:12.5px;font-weight:600;line-height:1.35;margin:14px 0 4px;}
+      .rx-pill__ico{flex:none;font-size:13px;line-height:1;}
+      .rx-pill__sep{opacity:.5;}
+      .rx-pill__lnk{color:inherit;font-weight:700;text-decoration:underline;text-underline-offset:2px;white-space:nowrap;}
+      .rx-pill__lnk:hover{color:inherit;text-decoration:none;}
+      .rx-pill--ok{background:#e8f5ec;border-color:#2d5a3d;color:#1e4a2d;}
+      .rx-pill--info{background:#eef4ff;border-color:#3b6fb0;color:#274a78;}
+      .rx-pill--warn{background:#fff6e0;border-color:#c08a12;color:#6b4e07;}
+      .rx-pill--stop{background:#fdeceb;border-color:#c0392b;color:#7a241b;}
+    </style>
+  {%- endunless -%}
+
+  {%- if rxp_allowed -%}
+    <div class="rx-pill rx-pill--ok" role="status" title="Your prescription license is verified — you're approved to purchase.">
+      <span class="rx-pill__ico" aria-hidden="true">✓</span> License verified
+    </div>
+  {%- elsif rxp_state == 'guest' -%}
+    <div class="rx-pill rx-pill--info" role="alert">
+      <span class="rx-pill__ico" aria-hidden="true">🔒</span> Log in to verify
+      <span class="rx-pill__sep" aria-hidden="true">·</span>
+      <a class="rx-pill__lnk" href="{{ routes.account_login_url }}?return_url=/pages/rx-apply">Log in</a>
+    </div>
+  {%- elsif rxp_state == 'review' -%}
+    <div class="rx-pill rx-pill--warn" role="status" title="Your RX verification is currently under manual review. We've received your documents and will email you once the review is complete.">
+      <span class="rx-pill__ico" aria-hidden="true">🔎</span> Under manual review
+    </div>
+  {%- else -%}
+    {%- comment -%} verify: logged in, gated, not allowed {%- endcomment -%}
+    <div class="rx-pill rx-pill--stop" role="alert" title="A valid prescription license is required to purchase this item. Verify once to unlock all Rx products.">
+      <span class="rx-pill__ico" aria-hidden="true">🔒</span> License required
+      <span class="rx-pill__sep" aria-hidden="true">·</span>
+      <a class="rx-pill__lnk" href="/pages/rx-apply?return_url={{ product.url | url_encode }}">Verify →</a>
+    </div>
+  {%- endif -%}
+{%- endif -%}

@@ -47,7 +47,7 @@
         </a>
 
         <div class="home-product-showcase__featured-content">
-          {%- if featured_product.tags contains 'requires-rx' -%}
+          {%- if featured_product.tags contains 'doctor-only' -%}
             <span class="home-product-showcase__rx-pill">Rx verification required</span>
           {%- endif -%}
 
@@ -99,7 +99,7 @@
             </span>
 
             <span class="home-product-showcase__item-info">
-              {%- if product.tags contains 'requires-rx' -%}
+              {%- if product.tags contains 'doctor-only' -%}
                 <span class="home-product-showcase__item-rx">Rx</span>
               {%- endif -%}
               <span class="home-product-showcase__item-title">{{ product.title }}</span>

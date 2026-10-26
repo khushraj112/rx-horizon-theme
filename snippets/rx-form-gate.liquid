@@ -1,233 +1,513 @@
-{%- comment -%}
-  rx-form-gate.liquid — tag-aware gate v8: server-side source of truth (no localStorage).
+{% comment %}
+  =============================================================================
+  rx-form-gate.liquid
+  Controls the prescription verification page. Self-gates by page.handle and
+  renders nothing on any other page, so it is safe to call from the shared page
+  section.
 
-  Shopify Flow tags are authoritative. Shopify Forms writes SYNCHRONOUSLY on submit,
-  so we bridge the window before Flow's tag lands using a server-readable signal:
-    Form 1 submitted → tag shopify-forms-1031424 OR metafield talon-approval.license_number
-    Form 2 submitted → tag shopify-forms-1031795 OR metafield custom.licensecredential_document
-  This stops the form from reappearing after submit without any client-side persistence.
-{%- endcomment -%}
+    /pages/rx-apply -> the single RX Verification form (Shopify Forms block in
+                       templates/page.rx-apply.json; Mountainside uses form_id 1072279)
 
-{%- if template.name == 'page' and page.handle == 'rx-apply' -%}
-  {%- if customer -%}
-    {%- liquid
-      assign rx_tag = ''
-      if customer.tags contains 'rx-verified'
-        assign rx_tag = 'verified'
-      elsif customer.tags contains 'rx-rejected'
-        assign rx_tag = 'rejected'
-      elsif customer.tags contains 'rx-review'
-        assign rx_tag = 'review'
-      elsif customer.tags contains 'rx-pending'
-        assign rx_tag = 'pending'
-      endif
+  The Shopify Forms inline app block is rendered separately by the page section.
+  This snippet renders status cards around it and HIDES the form block (via the
+  [id*='__forms_inline'] selector) in every state where the form should not show.
+  When the form should show, it locks the email field to the logged-in customer.
 
-      assign rx_f1 = false
-      if customer.tags contains 'shopify-forms-1031424'
-        assign rx_f1 = true
-      elsif customer.metafields['talon-approval']['license_number'].value != blank
-        assign rx_f1 = true
-      endif
-    -%}
+  Three customer states (backend / Shopify Flow owns the tags) — UNCHANGED:
+    doctor-only        -> allowed, no form (State 1)
+    rx-review-pending  -> hide form, "under manual review" message (State 2)
+    everything else    -> show the RX Verification V2 form (State 3)
 
-    {%- if rx_tag == 'pending' -%}
-      <style>[id*='__forms_inline']{display:none!important}</style>
-      <div style="margin:2rem 0;padding:1.5rem;background:#fff8e1;border:1px solid #f5c842;border-radius:8px;">
-        <h3 style="margin:0 0 0.5rem;">Application received</h3>
-        <p style="margin:0;">Your prescription licence is being verified. We will notify you by email once the review is complete.</p>
+  ---------------------------------------------------------------------------
+  TEMPORARY "processing" state (this file only — does NOT touch the three-state
+  logic above or any Shopify Flow integration):
+
+  After a successful form submit there is a short window where Shopify Forms has
+  stored the submission but Shopify Flow has not yet added the doctor-only /
+  rx-review-pending tag. During that window a plain refresh would re-render the
+  form (server still sees the customer as unverified), making people re-submit.
+
+  To close that gap we:
+    1) set sessionStorage 'rx_verification_processing' = 'true' on submit,
+    2) show a blocking "processing" popup and disable the form,
+    3) poll a fresh JSON status endpoint every 3s (templates/page.rx-status.liquid
+       at /pages/rx-apply?view=rx-status) until doctor_only OR rx_review_pending
+       is true, then clear the flag and reload/redirect so the normal Liquid
+       state machine renders the real state,
+    4) on load, if the flag exists and the server still says 'verify', resume the
+       popup + polling instead of showing the form (survives refresh / Forms reload).
+  The flag is session-scoped, so closing the tab reverts to normal tag logic.
+  =============================================================================
+{% endcomment %}
+
+{%- if page.handle == 'rx-apply' -%}
+  {%- liquid
+    # --- Server-truth state machine. doctor-only always wins.
+    # Case/space-insensitive tag match so 'Doctor-only' / 'doctor-only ' still resolve.
+    # Two distinct in-progress states, each with its own message:
+    #   rx-pending        -> 'pending'  : profile under AUTOMATIC verification (Veriflow running)
+    #   rx-review-pending -> 'review'   : profile under MANUAL review
+    # Both hide the form and persist server-side, so a refresh never re-shows the form
+    # while verification is in progress.
+    assign rx_customer_tags_norm = customer.tags | join: '|' | downcase
+    assign rx_state = 'verify'
+    if customer == nil
+      assign rx_state = 'guest'
+    elsif rx_customer_tags_norm contains 'doctor-only' or rx_customer_tags_norm contains 'rx-review-approved-auto'
+      assign rx_state = 'verified'
+    elsif rx_customer_tags_norm contains 'rx-review-rejected'
+      # Rejected -> let them re-submit the form (guard before the in-progress states).
+      assign rx_state = 'verify'
+    elsif rx_customer_tags_norm contains 'rx-review-pending'
+      assign rx_state = 'review'
+    elsif rx_customer_tags_norm contains 'rx-pending'
+      assign rx_state = 'pending'
+    endif
+
+    # Form shows only when the customer still needs to verify (never while in progress).
+    assign rx_show_form = false
+    if rx_state == 'verify'
+      assign rx_show_form = true
+    endif
+
+    # ===================== TEMP DEBUG — REMOVE WHEN DONE TESTING =====================
+    # Set rx_debug = true to ALWAYS render the raw Shopify Form and DISABLE our on-submit
+    # processing/popup/polling logic, so the native form and its native submission can be
+    # tested without any theme gating (login/verified/pending) or interference.
+    # Set back to false (or delete this block) to restore normal behaviour.
+    assign rx_debug = false
+    if rx_debug
+      assign rx_state = 'verify'
+      assign rx_show_form = true
+    endif
+    # ================================================================================
+  -%}
+
+  {%- comment -%} Hide the Shopify Forms inline block whenever this page is NOT in its form state. {%- endcomment -%}
+  {%- unless rx_show_form -%}
+    <style>[id*='__forms_inline']{display:none !important;}</style>
+  {%- endunless -%}
+
+  {%- comment -%} Client-side First/Last name validation (loads independently of rx_debug). {%- endcomment -%}
+  <script src="{{ 'rx-name-validation.js' | asset_url }}" defer></script>
+
+  <div class="rx-form-gate rx-form-gate--{{ rx_state }}" data-rx-form-gate data-rx-page="{{ page.handle }}" data-rx-state="{{ rx_state }}">
+    {%- if rx_state == 'guest' -%}
+      <div class="rx-form-gate__card">
+        <span class="rx-form-gate__icon" aria-hidden="true">🔒</span>
+        <h2 class="rx-form-gate__title">Log in to continue</h2>
+        <p class="rx-form-gate__text">Please log in to verify your prescription license.</p>
+        <a class="rx-form-gate__btn" href="{{ routes.account_login_url }}?return_url={{ '/pages/rx-apply' | url_encode }}">Log in</a>
       </div>
 
-    {%- elsif rx_tag == 'review' -%}
-      <style>[id*='__forms_inline']{display:none!important}</style>
-      <div style="margin:2rem 0;padding:1.5rem;background:#e8f4fd;border:1px solid #5ba4cf;border-radius:8px;">
-        <h3 style="margin:0 0 0.5rem;">Under manual review</h3>
-        <p style="margin:0;">Your application has been escalated for manual review. Our team will be in touch within 1-2 business days.</p>
+    {%- elsif rx_state == 'verified' -%}
+      <div class="rx-form-gate__card rx-form-gate__card--ok">
+        <span class="rx-form-gate__icon" aria-hidden="true">✔</span>
+        <h2 class="rx-form-gate__title">You're verified</h2>
+        <p class="rx-form-gate__text">Your prescription license is verified — all Rx items are unlocked. You can start shopping.</p>
+        <a class="rx-form-gate__btn" href="{{ routes.all_products_collection_url }}">Continue shopping</a>
       </div>
 
-    {%- elsif rx_tag == 'rejected' -%}
-      <style>[id*='__forms_inline']{display:none!important}</style>
-      <div style="margin:2rem 0;padding:1.5rem;background:#fdecea;border:1px solid #e57373;border-radius:8px;">
-        <h3 style="margin:0 0 0.5rem;">Verification unsuccessful</h3>
-        <p style="margin:0 0 1rem;">We were unable to verify your licence automatically. Please submit for manual review.</p>
-        <a href="/pages/rx-manual-review" style="display:inline-block;padding:0.6rem 1.2rem;background:#111;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;">Submit for manual review</a>
+    {%- elsif rx_state == 'review' -%}
+      <div class="rx-form-gate__card rx-form-gate__card--wait">
+        <span class="rx-form-gate__icon" aria-hidden="true">🔎</span>
+        <h2 class="rx-form-gate__title">Under manual review</h2>
+        <p class="rx-form-gate__text">Your RX verification is currently under manual review. We have received your documents and will notify you by email once the review is complete.</p>
       </div>
 
-    {%- elsif rx_tag == 'verified' -%}
-      <style>[id*='__forms_inline']{display:none!important}</style>
-      <div style="margin:2rem 0;padding:1.5rem;background:#e8f5e9;border:1px solid #66bb6a;border-radius:8px;">
-        <h3 style="margin:0 0 0.5rem;">You are verified!</h3>
-        <p style="margin:0;">Your Rx licence has been approved. You can now purchase prescription items.</p>
+    {%- elsif rx_state == 'pending' -%}
+      <div class="rx-form-gate__card rx-form-gate__card--wait" data-rx-processing-card>
+        <span class="rx-form-gate__icon" aria-hidden="true">🔄</span>
+        <h2 class="rx-form-gate__title">Under automatic verification</h2>
+        <p class="rx-form-gate__text">Your profile is currently being verified automatically. This usually takes only a few moments — there's nothing more to do and no need to resubmit. This page updates automatically once it's complete, and we'll email you either way.</p>
       </div>
 
-    {%- elsif rx_f1 -%}
-      {%- comment -%} Form 1 submitted; Flow hasn't applied rx-pending yet. Bridge with server truth. {%- endcomment -%}
-      <style>[id*='__forms_inline']{display:none!important}</style>
-      <div style="margin:2rem 0;padding:1.5rem;background:#fff8e1;border:1px solid #f5c842;border-radius:8px;">
-        <h3 style="margin:0 0 0.5rem;">Application received</h3>
-        <p style="margin:0;">Your prescription licence is being verified. We will notify you by email once the review is complete.</p>
+    {%- elsif rx_show_form -%}
+      <div class="rx-form-gate__intro" data-rx-intro>
+        <h2 class="rx-form-gate__title">Verify your prescription license</h2>
+        <p class="rx-form-gate__text">Enter your prescription license details and upload your document below. We'll review your submission and email you once it's verified.</p>
       </div>
-
-    {%- else -%}
-      <script>
-        (function(){
-          var em = {{ customer.email | json }};
-          if(!em) return;
-          var urlParam = new URLSearchParams(window.location.search).get('return_url');
-          if (urlParam && urlParam.charAt(0) === '/') { try { sessionStorage.setItem('rx_return_url', urlParam); } catch(e){} }
-          var returnUrl = urlParam || sessionStorage.getItem('rx_return_url') || document.referrer || '/';
-          var nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-          function lockEmail(){
-            document.querySelectorAll('[id*="__forms_inline"]').forEach(function(block){
-              Array.from(block.querySelectorAll('*')).filter(function(el){ return el.shadowRoot; }).forEach(function(host){
-                var inp = host.shadowRoot.querySelector('input#email');
-                if(inp){
-                  nativeSetter.call(inp, em);
-                  inp.dispatchEvent(new Event('input', {bubbles:true}));
-                  inp.dispatchEvent(new Event('change', {bubbles:true}));
-                  inp.setAttribute('readonly','readonly');
-                  inp.style.background='#f0f0f0';
-                  inp.style.cursor='not-allowed';
-                }
-              });
-            });
-          }
-          function showCountdown(url){
-            if(window.__rxRedirecting) return;
-            window.__rxRedirecting = true;
-            var ov = document.createElement('div');
-            ov.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:99999;';
-            ov.innerHTML = '<div style="background:#fff;padding:2rem 2.5rem;border-radius:12px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,0.2);"><div style="font-size:2rem;margin-bottom:0.5rem;">&#x2705;</div><h3 style="margin:0 0 0.5rem;font-size:1.2rem;">Application submitted!</h3><p style="margin:0;color:#555;">Redirecting in <strong id="rx-count">3</strong>s...</p></div>';
-            document.body.appendChild(ov);
-            var n=3; var t=setInterval(function(){ n--; var el=document.getElementById('rx-count'); if(el) el.textContent=n; if(n<=0){clearInterval(t);window.location.href=url+(url.indexOf('?')===-1?'?':'&')+'rxv='+Date.now();} },1000);
-          }
-          function watchSuccess(){
-            document.querySelectorAll('[id*="__forms_inline"]').forEach(function(block){
-              Array.from(block.querySelectorAll('*')).filter(function(el){ return el.shadowRoot; }).forEach(function(host){
-                new MutationObserver(function(){
-                  var s=host.shadowRoot; if(!s.querySelector('input#email')&&s.innerHTML.length>50){showCountdown(returnUrl);}
-                }).observe(host.shadowRoot,{childList:true,subtree:true});
-              });
-            });
-          }
-          lockEmail();
-          new MutationObserver(lockEmail).observe(document.body,{childList:true,subtree:true});
-          setTimeout(lockEmail,300); setTimeout(lockEmail,800); setTimeout(lockEmail,2000);
-          setTimeout(watchSuccess,1500);
-        })();
-      </script>
+      {%- comment -%} The Shopify Forms inline block (RX Verification V2) renders here, placed by the page section. {%- endcomment -%}
     {%- endif -%}
+  </div>
 
-  {%- else -%}
-    <style>[id*='__forms_inline']{display:none!important}</style>
-    <div style="margin:2rem 0;padding:1.5rem;background:#f5f5f5;border:1px solid #ddd;border-radius:8px;">
-      <p style="margin:0;">Please <a href="{{ routes.account_login_url }}?return_url=/pages/rx-apply">log in</a> to apply for Rx access.</p>
+  {%- comment -%} TEMP DEBUG: skip the processing popup + on-submit logic while rx_debug is on. {%- endcomment -%}
+  {%- unless rx_debug -%}
+  {%- comment -%} Processing popup — hidden by default; shown after submit or when resuming a processing session. {%- endcomment -%}
+  <div class="rx-proc" data-rx-proc hidden role="dialog" aria-modal="true" aria-labelledby="rx-proc-title" aria-describedby="rx-proc-text">
+    <div class="rx-proc__backdrop"></div>
+    <div class="rx-proc__card" aria-live="polite">
+      <span class="rx-proc__spinner" data-rx-proc-spinner aria-hidden="true"></span>
+      <h3 class="rx-proc__title" id="rx-proc-title" data-rx-proc-title>We've received your verification</h3>
+      <p class="rx-proc__text" id="rx-proc-text" data-rx-proc-text>Your documents are currently being processed. This usually takes only a few moments. Please keep this page open while we verify your information.</p>
+      <button type="button" class="rx-proc__btn" data-rx-proc-refresh hidden>Refresh status</button>
     </div>
-  {%- endif -%}
+  </div>
 
-{%- elsif template.name == 'page' and page.handle == 'rx-manual-review' -%}
-  {%- if customer -%}
-    {%- liquid
-      assign rx_tag2 = ''
-      if customer.tags contains 'rx-verified'
-        assign rx_tag2 = 'verified'
-      elsif customer.tags contains 'rx-rejected'
-        assign rx_tag2 = 'rejected'
-      elsif customer.tags contains 'rx-review'
-        assign rx_tag2 = 'review'
-      elsif customer.tags contains 'rx-pending'
-        assign rx_tag2 = 'pending'
-      endif
+  <script>
+    (function () {
+      // ---- config ----
+      var FLAG = 'rx_verification_processing';
+      var ENDPOINT = '/pages/rx-apply?view=rx-status';
+      var POLL_MS = 3000;      // poll every 3 seconds
+      var TIMEOUT_MS = 60000;  // stop after 60 seconds with no verification state
+      var CUSTOMER_EMAIL = {{ customer.email | json }};
 
-      assign rx_f2 = false
-      if customer.tags contains 'shopify-forms-1031795'
-        assign rx_f2 = true
-      elsif customer.metafields.custom.licensecredential_document.value != blank
-        assign rx_f2 = true
-      endif
-    -%}
+      var MSG = {
+        processing: {
+          title: "We've received your verification",
+          text: "Your documents are currently being processed. This usually takes only a few moments. Please keep this page open while we verify your information."
+        },
+        network: {
+          title: "We're still processing your verification",
+          text: "Please wait a moment…"
+        },
+        timeout: {
+          title: "Verification received",
+          text: "Your verification has been received and is still being processed. We'll notify you by email once the review is complete."
+        }
+      };
 
-    {%- if rx_tag2 == 'verified' -%}
-      <style>[id*='__forms_inline']{display:none!important}</style>
-      <div style="margin:2rem 0;padding:1.5rem;background:#e8f5e9;border:1px solid #66bb6a;border-radius:8px;">
-        <h3 style="margin:0 0 0.5rem;">You are verified!</h3>
-        <p style="margin:0;">Your Rx licence has already been approved.</p>
-      </div>
+      var gate = document.querySelector('[data-rx-form-gate]');
+      var serverState = gate ? gate.getAttribute('data-rx-state') : 'verify';
 
-    {%- elsif rx_tag2 == 'pending' or rx_tag2 == 'review' -%}
-      <style>[id*='__forms_inline']{display:none!important}</style>
-      <div style="margin:2rem 0;padding:1.5rem;background:#e8f4fd;border:1px solid #5ba4cf;border-radius:8px;">
-        <h3 style="margin:0 0 0.5rem;">Application in progress</h3>
-        <p style="margin:0;">Your application is already under review. No further action is needed.</p>
-      </div>
+      var popup = document.querySelector('[data-rx-proc]');
+      var titleEl = popup ? popup.querySelector('[data-rx-proc-title]') : null;
+      var textEl = popup ? popup.querySelector('[data-rx-proc-text]') : null;
+      var spinnerEl = popup ? popup.querySelector('[data-rx-proc-spinner]') : null;
+      var refreshBtn = popup ? popup.querySelector('[data-rx-proc-refresh]') : null;
 
-    {%- elsif rx_tag2 == 'rejected' and rx_f2 -%}
-      {%- comment -%} Form 2 submitted; Flow hasn't flipped rx-rejected → rx-review yet. Bridge with server truth. {%- endcomment -%}
-      <style>[id*='__forms_inline']{display:none!important}</style>
-      <div style="margin:2rem 0;padding:1.5rem;background:#e8f4fd;border:1px solid #5ba4cf;border-radius:8px;">
-        <h3 style="margin:0 0 0.5rem;">Application in progress</h3>
-        <p style="margin:0;">Your manual review request has been received. No further action is needed.</p>
-      </div>
+      // ---- flag helpers (session-scoped) ----
+      function hasFlag() { try { return sessionStorage.getItem(FLAG) === 'true'; } catch (e) { return false; } }
+      function setFlag() { try { sessionStorage.setItem(FLAG, 'true'); } catch (e) {} }
+      function clearFlag() { try { sessionStorage.removeItem(FLAG); } catch (e) {} }
 
-    {%- elsif rx_tag2 == 'rejected' -%}
-      <script>
-        (function(){
-          var em = {{ customer.email | json }};
-          if(!em) return;
-          var urlParam = new URLSearchParams(window.location.search).get('return_url');
-          if (urlParam && urlParam.charAt(0) === '/') { try { sessionStorage.setItem('rx_return_url', urlParam); } catch(e){} }
-          var returnUrl = urlParam || sessionStorage.getItem('rx_return_url') || document.referrer || '/';
-          var nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-          function lockEmail(){
-            document.querySelectorAll('[id*="__forms_inline"]').forEach(function(block){
-              Array.from(block.querySelectorAll('*')).filter(function(el){ return el.shadowRoot; }).forEach(function(host){
-                var inp = host.shadowRoot.querySelector('input#email');
-                if(inp){
-                  nativeSetter.call(inp, em);
-                  inp.dispatchEvent(new Event('input', {bubbles:true}));
-                  inp.dispatchEvent(new Event('change', {bubbles:true}));
-                  inp.setAttribute('readonly','readonly');
-                  inp.style.background='#f0f0f0';
-                  inp.style.cursor='not-allowed';
-                }
-              });
-            });
+      // ---- return_url helpers (land back on the product after verifying) ----
+      function sameOriginPath(raw) {
+        if (!raw) return null;
+        try {
+          var d = decodeURIComponent(raw);
+          if (d.charAt(0) === '/' && d.charAt(1) !== '/') return d;
+        } catch (e) {}
+        return null;
+      }
+      // Persist an incoming return_url so it survives a Shopify Forms page reload.
+      (function () {
+        try {
+          var incoming = sameOriginPath(new URLSearchParams(window.location.search).get('return_url'));
+          if (incoming) sessionStorage.setItem('rxReturn', incoming);
+        } catch (e) {}
+      })();
+      function getReturnUrl() {
+        var path = sameOriginPath(new URLSearchParams(window.location.search).get('return_url'));
+        if (!path) { try { path = sameOriginPath(sessionStorage.getItem('rxReturn')); } catch (e) {} }
+        if (!path) {
+          try {
+            var r = document.referrer;
+            if (r && r.indexOf(window.location.origin) === 0) {
+              var rp = r.slice(window.location.origin.length).split('#')[0];
+              if (rp.indexOf('/products/') === 0) path = rp;
+            }
+          } catch (e) {}
+        }
+        if (!path) return null;
+        // One-shot marker so the product page re-renders the fresh Rx status on arrival.
+        // The value is unique per redirect on purpose: it makes this a URL the browser
+        // has never fetched, so the arriving page is always a fresh server render and
+        // never the copy cached before the customer verified (which still shows the old
+        // pill). A constant marker would only survive the first attempt — a re-submit
+        // after a rejection would hit the cached ?rx_refresh=1 page.
+        return path + (path.indexOf('?') === -1 ? '?' : '&') + 'rx_refresh=' + Date.now();
+      }
+
+      // ---- popup rendering ----
+      function render(msg, showRefresh, showSpinner) {
+        if (titleEl) titleEl.textContent = msg.title;
+        if (textEl) textEl.textContent = msg.text;
+        if (refreshBtn) refreshBtn.hidden = !showRefresh;
+        if (spinnerEl) spinnerEl.style.display = showSpinner ? '' : 'none';
+      }
+      function showPopup() {
+        if (!popup) return;
+        render(MSG.processing, false, true);
+        popup.hidden = false;
+        document.body.style.overflow = 'hidden';
+      }
+
+      // ---- form interaction lock (prevents duplicate submissions) ----
+      function dimForm() {
+        var c = document.querySelector("[id*='__forms_inline']");
+        if (c) {
+          c.style.pointerEvents = 'none';
+          c.style.opacity = '0.45';
+          c.querySelectorAll('button, input, select, textarea').forEach(function (el) { el.disabled = true; });
+        }
+      }
+      function hideForm() {
+        var c = document.querySelector("[id*='__forms_inline']");
+        if (c) c.style.display = 'none';
+        var intro = document.querySelector('[data-rx-intro]');
+        if (intro) intro.style.display = 'none';
+      }
+
+      // ---- polling ----
+      var polling = false;
+      var pollTimer = null;
+      var startTime = 0;
+
+      function stopPolling() {
+        polling = false;
+        if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
+      }
+      function scheduleNext() {
+        if (!polling) return;
+        pollTimer = setTimeout(pollOnce, POLL_MS);
+      }
+      function complete() {
+        clearFlag();
+        stopPolling();
+        var target = getReturnUrl();
+        if (target) { window.location.href = target; } else { window.location.reload(); }
+      }
+      function showTimeout() {
+        stopPolling(); // stop, but KEEP the flag so a refresh still shows processing (never the form)
+        render(MSG.timeout, true, false);
+      }
+      function pollOnce() {
+        if (!polling) return;
+        if (Date.now() - startTime > TIMEOUT_MS) { showTimeout(); return; }
+        var url = ENDPOINT + (ENDPOINT.indexOf('?') === -1 ? '?' : '&') + '_=' + Date.now();
+        fetch(url, { credentials: 'same-origin', cache: 'no-store', headers: { 'X-Requested-With': 'fetch' } })
+          .then(function (r) { if (!r.ok) throw new Error('http ' + r.status); return r.text(); })
+          .then(function (txt) {
+            var data;
+            try { data = JSON.parse(txt); } catch (e) { throw new Error('parse'); }
+            // Leave the loading screen ONLY when a RESULT tag lands. We intentionally
+            // ignore the transient 'pending' (rx-pending = automation still running) —
+            // the customer stays on this screen until automation reports a real result:
+            //   'verified' = 'doctor-only' or 'rx-review-approved-auto' (approved)
+            //   'review'   = 'rx-review-pending' (manual review)
+            // A change INTO 'pending' must NOT navigate them out early.
+            // Falls back to the boolean check if 'state' isn't present.
+            var next = data && data.state;
+            var changed = next ? (next !== serverState && next !== 'pending')
+                               : (data && (data.doctor_only === true || data.rx_review_pending === true));
+            if (changed) {
+              // Carry the fresh state so the product page renders the right pill
+              // instantly (see snippets/rx-fresh-state.liquid). Mirrors rx-name-validation.js.
+              try { if (next) sessionStorage.setItem('rxFreshState', next); } catch (e) {}
+              complete(); // server state changed — reload into the real state
+            } else {
+              render(MSG.processing, false, true); // recover from any prior network message
+              scheduleNext();
+            }
+          })
+          .catch(function () {
+            // Edge Case 3 — network failure: retry, keep the flag, keep processing.
+            render(MSG.network, false, true);
+            if (Date.now() - startTime > TIMEOUT_MS) { showTimeout(); }
+            else { scheduleNext(); }
+          });
+      }
+      function startPolling() {
+        if (polling) return; // prevent multiple polling loops
+        polling = true;
+        startTime = Date.now();
+        pollOnce();
+      }
+
+      // Refresh Status button (after a 60s timeout) restarts polling.
+      if (refreshBtn) {
+        refreshBtn.addEventListener('click', function () {
+          render(MSG.processing, false, true);
+          startPolling();
+        });
+      }
+
+      // ---- enter the processing state (submit OR resume) ----
+      function beginProcessing(fromSubmit) {
+        setFlag();
+        showPopup();
+        if (fromSubmit) { dimForm(); } else { hideForm(); }
+        startPolling();
+      }
+
+      // ---- Shopify Forms binding (verify state only) ----
+      function lockEmailField() {
+        var container = document.querySelector("[id*='__forms_inline']");
+        if (!container || !CUSTOMER_EMAIL) return;
+        container.querySelectorAll("input[type='email'], input[name*='email' i]").forEach(function (el) {
+          el.value = CUSTOMER_EMAIL;
+          el.setAttribute('readonly', 'readonly');
+          el.style.backgroundColor = '#f1f1f1';
+        });
+      }
+      function bindForm() {
+        var container = document.querySelector("[id*='__forms_inline']");
+        if (!container) return;
+        lockEmailField();
+        if (container.__rxBound) return;
+        container.__rxBound = true;
+
+        // Native submit (fires only when the form is valid).
+        var form = container.querySelector('form');
+        if (form) {
+          form.addEventListener('submit', function () { beginProcessing(true); });
+        }
+        // Submit-button click (Shopify Forms often submits via its own AJAX button and
+        // never fires a native 'submit'). Skip if HTML5 validation would block it, so
+        // we don't enter processing on an invalid form.
+        container.addEventListener('click', function (e) {
+          var btn = e.target.closest('button[type="submit"], input[type="submit"], button:not([type])');
+          if (!btn) return;
+          var f = container.querySelector('form');
+          if (f && typeof f.checkValidity === 'function' && !f.checkValidity()) return;
+          beginProcessing(true);
+        });
+      }
+
+      // ---- init ----
+      function init() {
+        // Bind the form (Forms injects its block asynchronously; retry for a few seconds).
+        var attempts = 0;
+        var iv = setInterval(function () {
+          attempts++;
+          bindForm();
+          if (attempts >= 20) clearInterval(iv);
+        }, 400);
+        bindForm();
+
+        // SERVER-SIDE in-progress states ('pending' = automatic, 'review' = manual): the
+        // status card is already rendered and the form is hidden (persists across refreshes
+        // / sessions). No popup needed — just poll so the page auto-flips the moment the
+        // state changes (e.g. pending -> verified/review, or -> verify on rejection).
+        if (serverState === 'pending' || serverState === 'review') {
+          clearFlag(); // server truth now covers the gap; the session flag is redundant
+          startPolling();
+          return;
+        }
+
+        // SAME-SESSION bridge (Edge Case 1): just submitted, the tag hasn't landed
+        // server-side yet, so the server still says 'verify'. Show the popup, hide the
+        // form, and poll until the tag appears (which then renders the in-progress card).
+        if (hasFlag()) {
+          if (serverState === 'verify') {
+            beginProcessing(false);
+          } else {
+            // 'verified' (tags arrived) or 'guest' (logged out) -> normal UI.
+            clearFlag();
           }
-          function showCountdown(url){
-            if(window.__rxRedirecting) return;
-            window.__rxRedirecting = true;
-            var ov = document.createElement('div');
-            ov.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:99999;';
-            ov.innerHTML = '<div style="background:#fff;padding:2rem 2.5rem;border-radius:12px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,0.2);"><div style="font-size:2rem;margin-bottom:0.5rem;">&#x2705;</div><h3 style="margin:0 0 0.5rem;font-size:1.2rem;">Application submitted!</h3><p style="margin:0;color:#555;">Redirecting in <strong id="rx-count">3</strong>s...</p></div>';
-            document.body.appendChild(ov);
-            var n=3; var t=setInterval(function(){ n--; var el=document.getElementById('rx-count'); if(el) el.textContent=n; if(n<=0){clearInterval(t);window.location.href=url+(url.indexOf('?')===-1?'?':'&')+'rxv='+Date.now();} },1000);
-          }
-          function watchSuccess(){
-            document.querySelectorAll('[id*="__forms_inline"]').forEach(function(block){
-              Array.from(block.querySelectorAll('*')).filter(function(el){ return el.shadowRoot; }).forEach(function(host){
-                new MutationObserver(function(){
-                  var s=host.shadowRoot; if(!s.querySelector('input#email')&&s.innerHTML.length>50){showCountdown(returnUrl);}
-                }).observe(host.shadowRoot,{childList:true,subtree:true});
-              });
-            });
-          }
-          lockEmail();
-          new MutationObserver(lockEmail).observe(document.body,{childList:true,subtree:true});
-          setTimeout(lockEmail,300); setTimeout(lockEmail,800); setTimeout(lockEmail,2000);
-          setTimeout(watchSuccess,1500);
-        })();
-      </script>
+        }
+      }
 
-    {%- else -%}
-      <style>[id*='__forms_inline']{display:none!important}</style>
-      <div style="margin:2rem 0;padding:1.5rem;background:#f5f5f5;border:1px solid #ddd;border-radius:8px;">
-        <p style="margin:0;">No application found. Please <a href="/pages/rx-apply">submit your licence details</a> first.</p>
-      </div>
-    {%- endif -%}
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+      } else {
+        init();
+      }
+    })();
+  </script>
+  {%- endunless -%}
 
-  {%- else -%}
-    <style>[id*='__forms_inline']{display:none!important}</style>
-    <div style="margin:2rem 0;padding:1.5rem;background:#f5f5f5;border:1px solid #ddd;border-radius:8px;">
-      <p style="margin:0;">Please <a href="{{ routes.account_login_url }}?return_url=/pages/rx-manual-review">log in</a> to continue.</p>
-    </div>
-  {%- endif -%}
+  <style>
+    .rx-form-gate {
+      max-width: 640px;
+      margin: 24px auto;
+    }
+    /* Horizon: sections/main-page.liquid renders this snippet after the page blocks
+       (title, then the Forms app block) in a flex column. Keep the status card / intro
+       between the title and the form. */
+    .rx-form-gate { order: 1; }
+    [id*='__forms_inline'] { order: 2; }
+    .rx-form-gate__card {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 24px;
+      border: 2px solid #2d5a3d;
+      border-radius: 10px;
+      background-color: #f4f8f5;
+      color: #1e3a28;
+    }
+    .rx-form-gate__card--ok { background-color: #e8f5ec; }
+    .rx-form-gate__card--wait { border-color: #b8860b; background-color: #fff8e6; color: #5b4708; }
+    .rx-form-gate__icon { font-size: 24px; line-height: 1; }
+    .rx-form-gate__title { margin: 0; font-size: 20px; font-weight: 700; }
+    .rx-form-gate__text { margin: 0; font-size: 14px; line-height: 1.5; }
+    .rx-form-gate__intro { margin-bottom: 16px; text-align: center; }
+    .rx-form-gate__btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 6px;
+      padding: 12px 22px;
+      background-color: #2d5a3d;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 600;
+      text-decoration: none;
+      border-radius: 6px;
+      transition: background-color 0.2s ease;
+    }
+    .rx-form-gate__btn:hover { background-color: #1e4a2d; color: #fff; }
+
+    /* Processing popup */
+    .rx-proc {
+      position: fixed;
+      inset: 0;
+      z-index: 10001;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .rx-proc[hidden] { display: none; }
+    .rx-proc__backdrop { position: absolute; inset: 0; background: rgba(20, 40, 28, 0.6); }
+    .rx-proc__card {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 380px;
+      background: #fff;
+      border-radius: 14px;
+      padding: 30px 28px 26px;
+      text-align: center;
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
+      border-top: 4px solid #2d5a3d;
+    }
+    .rx-proc__spinner {
+      display: inline-block;
+      width: 34px;
+      height: 34px;
+      margin-bottom: 14px;
+      border: 3px solid #d7e6dc;
+      border-top-color: #2d5a3d;
+      border-radius: 50%;
+      animation: rx-proc-spin 0.8s linear infinite;
+    }
+    .rx-proc__title { margin: 0 0 8px; font-size: 18px; font-weight: 700; color: #1e3a28; text-wrap: balance; }
+    .rx-proc__text { margin: 0; font-size: 13.5px; line-height: 1.5; color: #55635b; }
+    .rx-proc__btn {
+      margin-top: 18px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 20px;
+      background-color: #2d5a3d;
+      color: #fff;
+      font-size: 13.5px;
+      font-weight: 700;
+      border: none;
+      border-radius: 7px;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+    }
+    .rx-proc__btn[hidden] { display: none; }
+    .rx-proc__btn:hover { background-color: #1e4a2d; }
+    @keyframes rx-proc-spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) {
+      .rx-proc__spinner { animation-duration: 2s; }
+    }
+  </style>
 {%- endif -%}

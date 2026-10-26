@@ -257,13 +257,26 @@
   </div>
 </div>
 
+{%- comment -%}
+  Rx cart guard: renders a banner only when the cart holds a 'doctor-only' product and
+  the customer is not allowed. Captured so checkout is also disabled server-side here:
+  cart drawer updates are morphed in and their inline scripts never run.
+{%- endcomment -%}
+{%- capture rx_cart_guard -%}{% render 'rx-cart-guard' %}{%- endcapture -%}
+{%- assign rx_cart_guard = rx_cart_guard | strip -%}
+{%- assign rx_checkout_blocked = false -%}
+{%- if rx_cart_guard != blank -%}
+  {%- assign rx_checkout_blocked = true -%}
+  {{ rx_cart_guard }}
+{%- endif -%}
+
 <div class="cart__ctas">
   <button
     type="submit"
     id="checkout"
     class="cart__checkout-button button"
     name="checkout"
-    {% if cart == empty %}
+    {% if cart == empty or rx_checkout_blocked %}
       disabled
     {% endif %}
     form="cart-form"
@@ -273,7 +286,7 @@
     </span>
   </button>
 
-  {% if additional_checkout_buttons and settings.show_accelerated_checkout_buttons %}
+  {% if additional_checkout_buttons and settings.show_accelerated_checkout_buttons and rx_checkout_blocked == false %}
     <div
       class="
         additional-checkout-buttons

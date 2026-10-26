@@ -1,0 +1,73 @@
+{% comment %}
+  Post-verification Rx pill — instant, no flash. Ported from Mountainside
+  sections/static-product.liquid. Rendered from layout/theme.liquid on product pages only.
+
+  When the customer verifies, the form page (rx-name-validation.js / rx-form-gate.liquid)
+  confirms the new state against the server and carries it here in
+  sessionStorage['rxFreshState'] before navigating back. We apply that known-good state
+  to the pill + Add to cart gating as soon as this page loads, so even if the product
+  page HTML came back cached (still showing "Verify"), the customer never sees the
+  stale pill.
+
+  The ?rx_refresh=<timestamp> marker is only used to keep the address bar clean.
+
+  KEEP IN SYNC: the PILL map below mirrors the markup in snippets/rx-status-pill.liquid.
+{% endcomment %}
+<script>
+  (function () {
+    // Clean the one-shot marker out of the address bar (no navigation).
+    var params = new URLSearchParams(window.location.search);
+    if (params.has('rx_refresh')) {
+      params.delete('rx_refresh');
+      var qs = params.toString();
+      window.history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
+      // Returning here means the verification round is OVER. Clear the processing/overlay
+      // flag so a later visit to /pages/rx-apply can never resume a stale loading overlay
+      // (which would otherwise hang until rx-form-gate's 60s timeout).
+      try { sessionStorage.removeItem('rx_verification_processing'); } catch (e) {}
+    }
+
+    // The state the form page confirmed just before sending us here. One-shot.
+    var state = null;
+    try { state = sessionStorage.getItem('rxFreshState'); sessionStorage.removeItem('rxFreshState'); } catch (e) {}
+    if (!state) return;
+
+    // Only the two RESULT states render a pill. 'rx-pending' (automation still running)
+    // is intentionally omitted — the customer stays on the form-page loading screen
+    // until automation lands a result, so they never arrive here in a 'pending' state.
+    var PILL = {
+      verified: { cls: 'rx-pill--ok',   ico: '✓', text: 'License verified',
+                  title: "Your prescription license is verified — you're approved to purchase." },
+      review:   { cls: 'rx-pill--warn', ico: '🔎', text: 'Under manual review',
+                  title: "Your RX verification is currently under manual review. We've received your documents and will email you once the review is complete." }
+    };
+    var def = PILL[state];
+    if (!def) return;
+
+    function applyPill(pill) {
+      pill.className = 'rx-pill ' + def.cls;
+      pill.setAttribute('role', 'status');
+      pill.setAttribute('title', def.title);
+      pill.innerHTML = '<span class="rx-pill__ico" aria-hidden="true">' + def.ico + '</span> ' + def.text;
+    }
+    function applyAtc(wrap) {
+      if (!wrap.hasAttribute('data-rx-required')) return;
+      if (state === 'verified') {
+        // Customer is now allowed — remove the gate so Add to cart works directly.
+        ['data-rx-required', 'data-rx-state', 'data-rx-verify-url', 'data-rx-login-url']
+          .forEach(function (a) { wrap.removeAttribute(a); });
+      } else {
+        // Still gated (review); keep the gate but show the right modal message.
+        wrap.setAttribute('data-rx-state', state);
+      }
+    }
+
+    function run() {
+      document.querySelectorAll('.rx-pill').forEach(applyPill);
+      document.querySelectorAll('[data-rx-atc]').forEach(applyAtc);
+    }
+
+    if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', run); }
+    else { run(); }
+  })();
+</script>

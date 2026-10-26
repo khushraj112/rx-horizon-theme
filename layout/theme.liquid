@@ -131,6 +131,15 @@
 
     {% render 'search-modal' %}
 
+    {%- comment -%}
+      Rx verify/login popup for gated ('doctor-only') Add to cart buttons on every
+      template (product page, quick add, featured product). Hidden until opened.
+    {%- endcomment -%}
+    {% render 'rx-verify-modal' %}
+    {%- if template.name == 'product' -%}
+      {% render 'rx-fresh-state' %}
+    {%- endif -%}
+
     {% if settings.quick_add or settings.mobile_quick_add %}
       {% render 'quick-add-modal' %}
     {% endif %}

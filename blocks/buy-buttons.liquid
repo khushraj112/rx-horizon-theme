@@ -17,16 +17,30 @@
   assign add_to_cart_text = 'products.product.unavailable' | t
 
   comment
-    Rx prescription gate: hide buy buttons for gated products unless the
-    customer is tagged rx-verified. Normal products are unaffected.
+    Rx gate (mirrors Mountainside product-form.liquid). Products tagged 'doctor-only'
+    are gated. A customer is allowed when tagged 'doctor-only' or 'rx-review-approved-auto'
+    (case/space-insensitive). The Add to cart button always renders; when the customer
+    is not allowed it is wrapped in data-rx-* attributes and snippets/rx-verify-modal
+    opens the verification popup on click instead of adding to cart.
+    rx_state: guest | review ('rx-review-pending') | verify (everyone else, incl. rejected).
+    The transient 'rx-pending' is deliberately ignored here; while automation runs the
+    customer stays on the /pages/rx-apply loading screen (snippets/rx-form-gate).
   endcomment
   assign rx_gated = false
-  assign rx_verified_badge = false
-  if product.tags contains 'requires-rx'
-    if customer.tags contains 'rx-verified'
-      assign rx_verified_badge = true
-    else
-      assign rx_gated = true
+  assign rx_required = false
+  if product.tags contains 'doctor-only'
+    assign rx_gated = true
+    assign rx_customer_tags_norm = customer.tags | join: '|' | downcase
+    unless rx_customer_tags_norm contains 'doctor-only' or rx_customer_tags_norm contains 'rx-review-approved-auto'
+      assign rx_required = true
+    endunless
+    assign rx_state = 'verify'
+    if customer == nil
+      assign rx_state = 'guest'
+    elsif rx_customer_tags_norm contains 'rx-review-rejected'
+      assign rx_state = 'verify'
+    elsif rx_customer_tags_norm contains 'rx-review-pending'
+      assign rx_state = 'review'
     endif
   endif
 
@@ -79,6 +93,10 @@
         {%- if block_settings.gift_card_form and product.gift_card? -%}
           {%- render 'gift-card-recipient-form', product: product, form: form, section: section, block: block -%}
           <span class="buy-buttons-block__bar">
+        {%- endif -%}
+        {%- comment -%} Rx status pill: gated products only, above the buttons. {%- endcomment -%}
+        {%- if rx_gated -%}
+          {% render 'rx-status-pill', product: product %}
         {%- endif -%}
         <div
           class="product-form-buttons spacing-style{% if block_settings.stacking %} product-form-buttons--stacked{% endif %}"
@@ -230,29 +248,34 @@
               </div>
             </volume-pricing>
           {%- endif -%}
-          {%- if rx_gated -%}
-            {% render 'rx-gate', product: product, customer: customer %}
-          {%- else -%}
-            {%- if rx_verified_badge -%}
-              <div class="rx-verified-badge" style="display:flex;align-items:center;gap:.5rem;padding:.6rem .9rem;margin:0 0 .75rem;background:#e8f5e9;border:1px solid #66bb6a;border-radius:8px;color:#1b5e20;font-weight:600;font-size:.95rem;line-height:1.3;">
-                <span aria-hidden="true" style="font-size:1.05rem;">&#10003;</span>
-                <span>Prescription license verified &mdash; you're approved to purchase.</span>
-              </div>
-            {%- endif -%}
+          {%- comment -%} Rx click-intercept hooks: present only when gated AND customer not allowed. {%- endcomment -%}
+          <span
+            class="rx-atc"
+            data-rx-atc
+            {%- if rx_required %}
+              data-rx-required="true"
+              data-rx-state="{{ rx_state }}"
+              data-rx-verify-url="/pages/rx-apply?return_url={{ product.url | url_encode }}"
+              data-rx-login-url="{{ routes.account_login_url }}?return_url=/pages/rx-apply"
+            {% endif -%}
+          >
             {% content_for 'block',
               type: 'add-to-cart',
               id: 'add-to-cart',
               can_add_to_cart: can_add_to_cart,
               add_to_cart_text: add_to_cart_text
             %}
+          </span>
 
+          {%- comment -%} Accelerated checkout skips the cart, so it is never offered on a gated product to a customer who is not allowed. {%- endcomment -%}
+          {%- unless rx_required -%}
             {% content_for 'block',
               type: 'accelerated-checkout',
               id: 'accelerated-checkout',
               can_add_to_cart: can_add_to_cart,
               form_obj: form
             %}
-          {%- endif -%}
+          {%- endunless -%}
         </div>
         {%- if block_settings.gift_card_form and product.gift_card? -%}
           </span>

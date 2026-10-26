@@ -183,6 +183,11 @@
               },
               "blocks": {}
             },
+            "rx_how_to_buy": {
+              "type": "rx-how-to-buy",
+              "settings": {},
+              "blocks": {}
+            },
             "buy_buttons_eYQEYi": {
               "type": "buy-buttons",
               "settings": {
@@ -248,6 +253,7 @@
             "group_icgrde",
             "divider_VJhene",
             "variant_picker_R3rGDr",
+            "rx_how_to_buy",
             "buy_buttons_eYQEYi",
             "text_aEtTtq"
           ]

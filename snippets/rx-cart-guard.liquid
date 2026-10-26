@@ -1,0 +1,90 @@
+{%- comment -%}
+  =============================================================================
+  rx-cart-guard.liquid
+  Server-side compliance backstop for the cart. Ported from Mountainside. The product
+  Add to cart is click-intercepted (client-side, therefore bypassable), so this blocks
+  checkout when the cart holds a gated ('doctor-only') product AND the customer is
+  NOT allowed — matching blocks/buy-buttons.liquid. Rendered (captured) from
+  snippets/cart-summary.liquid, which also disables checkout server-side.
+
+  Renders nothing unless blocked. When blocked it shows a banner and disables every
+  checkout/express button on the page (selector-based, so it covers all cart
+  layouts without editing each button).
+
+  LIMITATION: theme-level / best-effort. The disabling script only runs when the
+  server says blocked, but it is still client-side and can be bypassed (devtools,
+  JS off, direct POST to /cart/add + /checkout). FULL enforcement requires a Shopify
+  Cart/Checkout Validation Function — OUT OF THEME SCOPE; flag to whoever owns
+  Shopify Functions. If the owner accepts UX-only enforcement, this can stand alone.
+
+  FUTURE: a terminal 'rx-denied' customer would also be blocked here (deferred).
+  =============================================================================
+{%- endcomment -%}
+{%- comment -%} Case/space-insensitive tag match — see blocks/buy-buttons.liquid. {%- endcomment -%}
+{%- assign rx_allowed_customer = false -%}
+{%- assign rx_customer_tags_norm = customer.tags | join: '|' | downcase -%}
+{%- if rx_customer_tags_norm contains 'doctor-only' or rx_customer_tags_norm contains 'rx-review-approved-auto' -%}
+  {%- assign rx_allowed_customer = true -%}
+{%- endif -%}
+{%- assign rx_checkout_blocked = false -%}
+{%- unless rx_allowed_customer -%}
+  {%- for line_item in cart.items -%}
+    {%- if line_item.product.tags contains 'doctor-only' -%}
+      {%- assign rx_checkout_blocked = true -%}
+      {%- break -%}
+    {%- endif -%}
+  {%- endfor -%}
+{%- endunless -%}
+
+{%- if rx_checkout_blocked -%}
+  <div class="rx-cart-block" role="alert" data-rx-cart-block>
+    <strong>Prescription verification required.</strong>
+    Your cart contains an Rx item that needs a verified prescription license.
+    <a href="/pages/rx-apply">Verify your license</a> to check out.
+  </div>
+
+  <script>
+    (function () {
+      function enforce() {
+        document.querySelectorAll('button[name="checkout"]').forEach(function (b) {
+          b.disabled = true;
+          b.setAttribute('aria-disabled', 'true');
+        });
+        document.querySelectorAll('.additional-checkout-buttons').forEach(function (el) {
+          el.style.display = 'none';
+        });
+        document.querySelectorAll('form[action^="/cart"]').forEach(function (f) {
+          if (f.__rxGuard) return;
+          f.__rxGuard = true;
+          f.addEventListener('submit', function (e) {
+            // Block only the checkout submit; allow cart/quantity updates through.
+            if (e.submitter && e.submitter.name === 'checkout') {
+              e.preventDefault();
+              var banner = document.querySelector('[data-rx-cart-block]');
+              if (banner) banner.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          });
+        });
+      }
+      enforce();
+      document.addEventListener('DOMContentLoaded', enforce);
+      // Cart scripts may re-render the summary; re-apply for a short window.
+      var n = 0;
+      var iv = setInterval(function () { enforce(); if (++n > 12) clearInterval(iv); }, 800);
+    })();
+  </script>
+
+  <style>
+    .rx-cart-block {
+      margin: 12px 0;
+      padding: 14px 16px;
+      border: 2px solid #c0392b;
+      background: #fdeceb;
+      color: #7a241b;
+      border-radius: 8px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    .rx-cart-block a { color: #7a241b; font-weight: 700; text-decoration: underline; }
+  </style>
+{%- endif -%}

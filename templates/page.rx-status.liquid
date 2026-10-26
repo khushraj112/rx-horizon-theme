@@ -1,0 +1,55 @@
+{%- comment -%}
+  =============================================================================
+  page.rx-status.liquid — lightweight customer RX-status endpoint (JSON).
+
+  Fetched client-side by the processing poller in snippets/rx-form-gate.liquid at:
+      /pages/rx-apply?view=rx-status&_=<cachebuster>
+
+  `{% layout none %}` strips the theme layout so the response body is pure JSON.
+  Because it is re-fetched on every poll (same-origin, so the customer session
+  cookie is sent), each request is a FRESH server render that reflects the
+  customer's CURRENT tags — this is how we detect tag changes that Shopify Flow
+  applies AFTER the page first loaded (the already-loaded Liquid cannot).
+
+  Response shape (contract with the poller):
+      {"doctor_only": <bool>, "rx_review_pending": <bool>}
+
+  Reads ONLY the two existing tags — it does not change any RX verification or
+  Shopify Flow logic.
+  =============================================================================
+{%- endcomment -%}
+{%- layout none -%}
+{%- liquid
+  # Mirror the rx-form-gate.liquid state machine EXACTLY so the poller can reload the
+  # moment the server-rendered state would change (pending -> verified/review, etc.).
+  assign rx_tags = customer.tags | join: '|' | downcase
+  assign rx_doctor = false
+  assign rx_review = false
+  assign rx_pending = false
+  assign rx_approved_auto = false
+  if rx_tags contains 'doctor-only'
+    assign rx_doctor = true
+  endif
+  if rx_tags contains 'rx-review-pending'
+    assign rx_review = true
+  endif
+  if rx_tags contains 'rx-pending'
+    assign rx_pending = true
+  endif
+  if rx_tags contains 'rx-review-approved-auto'
+    assign rx_approved_auto = true
+  endif
+  assign rx_state = 'verify'
+  if customer == nil
+    assign rx_state = 'guest'
+  elsif rx_doctor or rx_approved_auto
+    assign rx_state = 'verified'
+  elsif rx_tags contains 'rx-review-rejected'
+    assign rx_state = 'verify'
+  elsif rx_review
+    assign rx_state = 'review'
+  elsif rx_pending
+    assign rx_state = 'pending'
+  endif
+-%}
+{"doctor_only": {{ rx_doctor }}, "rx_review_pending": {{ rx_review }}, "rx_pending": {{ rx_pending }}, "state": {{ rx_state | json }}}
