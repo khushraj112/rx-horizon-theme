@@ -1,0 +1,60 @@
+{%- doc -%}
+  Black Friday demo product card (functional, minimal styling).
+  Reads custom.sale_label / custom.sale_percentage metafields dynamically.
+  Shopify pricing only: native automatic discounts are applied in the cart, never calculated here.
+
+  @param {product} product - The product to render
+{%- enddoc -%}
+
+{%- liquid
+  assign sale_label = product.metafields.custom.sale_label.value
+  assign sale_pct = product.metafields.custom.sale_percentage.value
+  assign first_variant = product.selected_or_first_available_variant
+  assign compare = first_variant.compare_at_price
+-%}
+
+<bf-card class="bf-card" data-product-id="{{ product.id }}" data-product-handle="{{ product.handle }}">
+  <a class="bf-card__media" href="{{ product.url }}">
+    {%- if product.featured_image -%}
+      {{ product.featured_image | image_url: width: 600 | image_tag: loading: 'lazy', widths: '300, 450, 600', sizes: '(min-width: 750px) 25vw, 50vw', alt: product.title }}
+    {%- endif -%}
+    {%- if sale_label != blank -%}
+      <span class="bf-badge" data-bf-label>{{ sale_label }}</span>
+    {%- endif -%}
+  </a>
+  <h3 class="bf-card__title"><a href="{{ product.url }}">{{ product.title }}</a></h3>
+
+  <div class="bf-card__price" data-bf-price>
+    {%- if compare > first_variant.price -%}
+      <s class="bf-price__compare" data-bf-compare>{{ compare | money }}</s>
+    {%- else -%}
+      <s class="bf-price__compare" data-bf-compare hidden></s>
+    {%- endif -%}
+    <span class="bf-price__current" data-bf-current>{{ first_variant.price | money }}</span>
+  </div>
+
+  {%- if sale_pct != blank -%}
+    <p class="bf-card__pct" data-bf-pct>
+      {{ sale_pct }}% off &middot; <span class="bf-note">discount applied automatically in cart</span>
+    </p>
+  {%- endif -%}
+
+  <select class="bf-select" data-bf-variant aria-label="{{ product.title | escape }} variant">
+    {%- for variant in product.variants -%}
+      <option
+        value="{{ variant.id }}"
+        data-price="{{ variant.price | money }}"
+        data-compare="{% if variant.compare_at_price > variant.price %}{{ variant.compare_at_price | money }}{% endif %}"
+        {% unless variant.available %}disabled{% endunless %}
+        {% if variant.id == first_variant.id %}selected{% endif %}
+      >
+        {{ variant.title }}{% unless variant.available %} (sold out){% endunless %} &ndash; {{ variant.price | money }}
+      </option>
+    {%- endfor -%}
+  </select>
+
+  <button type="button" class="bf-btn" data-bf-add {% unless product.available %}disabled{% endunless %}>
+    {%- if product.available -%}Add to Cart{%- else -%}Sold out{%- endif -%}
+  </button>
+  <p class="bf-msg" data-bf-msg role="status" aria-live="polite"></p>
+</bf-card>

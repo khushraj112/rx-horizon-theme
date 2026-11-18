@@ -1,0 +1,150 @@
+{%- comment -%}
+  Black Friday demo page: hero + email signup, Flagship Deals, Bestsellers, BOGO Drops.
+  All data is dynamic: product metafields (custom.sale_label / custom.sale_percentage)
+  and published "bogo_offer" metaobjects. Nothing hardcoded.
+{%- endcomment -%}
+
+{%- liquid
+  assign source = section.settings.source_collection | default: collections.all
+  assign bestsellers_src = section.settings.bestsellers_collection | default: source
+-%}
+
+<div class="bf-demo" id="bf-demo-{{ section.id }}">
+  <header class="bf-hero">
+    <h1>{{ section.settings.heading }}</h1>
+    <p>{{ section.settings.subheading }}</p>
+
+    <bf-signup
+      class="bf-signup"
+      data-company-id="{{ section.settings.klaviyo_company_id | escape }}"
+      data-list-id="{{ section.settings.klaviyo_list_id | escape }}"
+    >
+      <form novalidate>
+        <label for="bf-email-{{ section.id }}" class="visually-hidden">Email</label>
+        <input id="bf-email-{{ section.id }}" type="email" name="email" required autocomplete="email" placeholder="you@example.com">
+        <button type="submit" class="bf-btn">Notify Me</button>
+        <p class="bf-consent">
+          {{ section.settings.consent_text }}
+        </p>
+        <p class="bf-msg" data-bf-signup-msg role="status" aria-live="polite"></p>
+      </form>
+    </bf-signup>
+  </header>
+
+  <section class="bf-block" aria-labelledby="bf-flagship">
+    <h2 id="bf-flagship">Flagship Deals</h2>
+    <p class="bf-sub">Products carrying a sale percentage metafield.</p>
+    <div class="bf-grid">
+      {%- assign flagship_count = 0 -%}
+      {%- for product in source.products -%}
+        {%- if product.metafields.custom.sale_percentage.value != blank -%}
+          {%- if flagship_count < section.settings.flagship_limit -%}
+            {% render 'bf-product-card', product: product %}
+            {%- assign flagship_count = flagship_count | plus: 1 -%}
+          {%- endif -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {%- if flagship_count == 0 -%}<p>No products have custom.sale_percentage set.</p>{%- endif -%}
+    </div>
+  </section>
+
+  <section class="bf-block" aria-labelledby="bf-best">
+    <h2 id="bf-best">Bestsellers</h2>
+    <div class="bf-grid">
+      {%- for product in bestsellers_src.products limit: section.settings.bestsellers_limit -%}
+        {% render 'bf-product-card', product: product %}
+      {%- endfor -%}
+    </div>
+  </section>
+
+  <section class="bf-block" aria-labelledby="bf-bogo">
+    <h2 id="bf-bogo">BOGO Drops</h2>
+    <div class="bf-grid bf-grid--bogo">
+      {%- assign bogo_count = 0 -%}
+      {%- for offer in shop.metaobjects.bogo_offer.values -%}
+        {%- if offer.display_status.value == true -%}
+          {%- assign q = offer.qualifying_product.value -%}
+          {%- assign r = offer.reward_products.value | first -%}
+          {%- if q != blank and r != blank -%}
+            {%- assign bogo_count = bogo_count | plus: 1 -%}
+            <bf-bogo class="bf-bogo" data-offer="{{ offer.system.handle }}">
+              <h3>{{ offer.offer_title.value }}</h3>
+              <p class="bf-badge bf-badge--static">{{ offer.promotional_label.value }}</p>
+              <div class="bf-bogo__pair">
+                {%- for item in (1..2) -%}
+                  {%- if forloop.first %}{% assign p = q %}{% assign role = 'qualifying' %}{% else %}{% assign p = r %}{% assign role = 'reward' %}{% endif -%}
+                  <div class="bf-bogo__item" data-role="{{ role }}">
+                    <span class="bf-role">{% if role == 'qualifying' %}Buy this{% else %}Get this at reduced price{% endif %}</span>
+                    <a href="{{ p.url }}">{{ p.featured_image | image_url: width: 400 | image_tag: loading: 'lazy', alt: p.title }}</a>
+                    <h4><a href="{{ p.url }}">{{ p.title }}</a></h4>
+                    <div class="bf-card__price"><span class="bf-price__current" data-bf-current>{{ p.selected_or_first_available_variant.price | money }}</span></div>
+                    <select class="bf-select" data-bf-variant aria-label="{{ p.title | escape }} variant">
+                      {%- for variant in p.variants -%}
+                        <option value="{{ variant.id }}" data-price="{{ variant.price | money }}" {% unless variant.available %}disabled{% endunless %} {% if variant.id == p.selected_or_first_available_variant.id %}selected{% endif %}>
+                          {{ variant.title }}{% unless variant.available %} (sold out){% endunless %} &ndash; {{ variant.price | money }}
+                        </option>
+                      {%- endfor -%}
+                    </select>
+                  </div>
+                {%- endfor -%}
+              </div>
+              <p class="bf-note">Reward price is applied by Shopify's automatic discount once both items are in the cart.</p>
+              <button type="button" class="bf-btn" data-bf-add-both>Add Both Products</button>
+              <p class="bf-msg" data-bf-msg role="status" aria-live="polite"></p>
+            </bf-bogo>
+          {%- endif -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {%- if bogo_count == 0 -%}<p>No published BOGO offers.</p>{%- endif -%}
+    </div>
+  </section>
+</div>
+
+<script src="{{ 'bf-demo.js' | asset_url }}" type="module" async></script>
+
+{% stylesheet %}
+  .bf-demo { max-width: 1200px; margin: 0 auto; padding: 24px 16px 64px; }
+  .bf-hero { text-align: center; padding: 32px 0; }
+  .bf-signup form { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 16px; }
+  .bf-signup input { min-width: 240px; padding: 10px; border: 1px solid currentColor; }
+  .bf-consent { flex-basis: 100%; font-size: 12px; opacity: .8; }
+  .bf-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; }
+  .bf-grid--bogo { grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); }
+  .bf-block { margin-top: 40px; }
+  .bf-card, .bf-bogo { display: flex; flex-direction: column; gap: 8px; border: 1px solid rgb(0 0 0 / .15); padding: 12px; }
+  .bf-card__media { position: relative; display: block; }
+  .bf-card__media img, .bf-bogo img { width: 100%; height: auto; display: block; }
+  .bf-badge { position: absolute; top: 8px; left: 8px; background: #000; color: #fff; padding: 2px 8px; font-size: 12px; }
+  .bf-badge--static { position: static; align-self: flex-start; }
+  .bf-card__title, .bf-bogo h4 { font-size: 15px; margin: 0; }
+  .bf-price__compare { opacity: .6; margin-right: 6px; }
+  .bf-note { font-size: 12px; opacity: .75; }
+  .bf-select { padding: 8px; width: 100%; }
+  .bf-btn { padding: 10px 16px; background: #000; color: #fff; border: 0; cursor: pointer; }
+  .bf-btn[disabled] { opacity: .5; cursor: not-allowed; }
+  .bf-msg { font-size: 13px; min-height: 1em; margin: 0; }
+  .bf-msg[data-state='error'] { color: #b00020; }
+  .bf-msg[data-state='ok'] { color: #0a6b2d; }
+  .bf-bogo__pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .bf-bogo__item { display: flex; flex-direction: column; gap: 6px; }
+  .bf-role { font-size: 12px; text-transform: uppercase; opacity: .7; }
+{% endstylesheet %}
+
+{% schema %}
+{
+  "name": "Black Friday demo",
+  "settings": [
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Black Friday Demo" },
+    { "type": "text", "id": "subheading", "label": "Subheading", "default": "Sign up to be notified when deals go live." },
+    { "type": "textarea", "id": "consent_text", "label": "Marketing consent text", "default": "By subscribing you agree to receive marketing emails. Unsubscribe any time." },
+    { "type": "collection", "id": "source_collection", "label": "Deals source collection (blank = all products)" },
+    { "type": "range", "id": "flagship_limit", "label": "Flagship deals limit", "min": 1, "max": 12, "default": 6 },
+    { "type": "collection", "id": "bestsellers_collection", "label": "Bestsellers collection (blank = deals source)" },
+    { "type": "range", "id": "bestsellers_limit", "label": "Bestsellers limit", "min": 1, "max": 12, "default": 4 },
+    { "type": "header", "content": "Klaviyo (leave blank until configured)" },
+    { "type": "text", "id": "klaviyo_company_id", "label": "Klaviyo public API key (company ID)" },
+    { "type": "text", "id": "klaviyo_list_id", "label": "Klaviyo list ID" }
+  ],
+  "presets": [{ "name": "Black Friday demo" }]
+}
+{% endschema %}
