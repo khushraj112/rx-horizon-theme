@@ -1,6 +1,16 @@
 {
   "sections": {
-    "main": { "type": "bf-demo", "settings": {} }
+    "main": {
+      "type": "bf-demo",
+      "blocks": {
+        "t1": { "type": "trust", "settings": { "title": "Fast shipping", "text": "Reliable delivery on all in-stock orders." } },
+        "t2": { "type": "trust", "settings": { "title": "Price match", "text": "Contact support to claim a price difference." } },
+        "t3": { "type": "trust", "settings": { "title": "Easy returns", "text": "Extended holiday return window." } },
+        "t4": { "type": "trust", "settings": { "title": "Warranty", "text": "Hassle-free replacement on eligible items." } }
+      },
+      "block_order": ["t1", "t2", "t3", "t4"],
+      "settings": {}
+    }
   },
   "order": ["main"]
 }

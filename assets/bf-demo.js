@@ -136,3 +136,13 @@ class BfSignup extends HTMLElement {
 if (!customElements.get('bf-card')) customElements.define('bf-card', BfCard);
 if (!customElements.get('bf-bogo')) customElements.define('bf-bogo', BfBogo);
 if (!customElements.get('bf-signup')) customElements.define('bf-signup', BfSignup);
+
+class BfCarousel extends HTMLElement {
+  connectedCallback() {
+    const track = this.querySelector('[data-bf-track]');
+    const step = () => (track.firstElementChild?.getBoundingClientRect().width || 300) + 24;
+    this.querySelector('[data-bf-prev]')?.addEventListener('click', () => track.scrollBy({ left: -step(), behavior: 'smooth' }));
+    this.querySelector('[data-bf-next]')?.addEventListener('click', () => track.scrollBy({ left: step(), behavior: 'smooth' }));
+  }
+}
+if (!customElements.get('bf-carousel')) customElements.define('bf-carousel', BfCarousel);

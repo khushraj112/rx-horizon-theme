@@ -56,11 +56,17 @@
 
   <section class="bf-block" aria-labelledby="bf-best">
     <h2 id="bf-best">Bestsellers</h2>
-    <div class="bf-grid">
-      {%- for product in bestsellers_src.products limit: section.settings.bestsellers_limit -%}
-        {% render 'bf-product-card', product: product %}
-      {%- endfor -%}
-    </div>
+    <bf-carousel class="bf-carousel">
+      <div class="bf-track" data-bf-track>
+        {%- for product in bestsellers_src.products limit: section.settings.bestsellers_limit -%}
+          {% render 'bf-product-card', product: product %}
+        {%- endfor -%}
+      </div>
+      <div class="bf-carousel__nav">
+        <button type="button" class="bf-arrow" data-bf-prev aria-label="Previous">&larr;</button>
+        <button type="button" class="bf-arrow" data-bf-next aria-label="Next">&rarr;</button>
+      </div>
+    </bf-carousel>
   </section>
 
   <section class="bf-block" aria-labelledby="bf-bogo">
@@ -104,6 +110,20 @@
       {%- if bogo_count == 0 -%}<p>No published BOGO offers.</p>{%- endif -%}
     </div>
   </section>
+
+  {%- if section.blocks.size > 0 -%}
+    <section class="bf-block">
+      <h2>{{ section.settings.trust_heading }}</h2>
+      <div class="bf-trust">
+        {%- for block in section.blocks -%}
+          <div class="bf-trust__item" {{ block.shopify_attributes }}>
+            <h3>{{ block.settings.title }}</h3>
+            <p>{{ block.settings.text }}</p>
+          </div>
+        {%- endfor -%}
+      </div>
+    </section>
+  {%- endif -%}
 </div>
 
 <script src="{{ 'bf-demo.js' | asset_url }}" type="module" async></script>
@@ -159,7 +179,26 @@
   .bf-bogo__item { display: flex; flex-direction: column; gap: 6px; }
   .bf-role { font-size: 12px; text-transform: uppercase; color: #6b6b6b; font-weight: 600; }
   .bf-bogo__item[data-role='reward'] .bf-role { color: var(--bf-orange); }
+  .bf-block:first-of-type .bf-grid > .bf-card:first-child { grid-column: 1 / -1; display: grid; grid-template-columns: 1.3fr 1fr; column-gap: 24px; align-items: center; background: linear-gradient(135deg, #ffb347, #ff5f00 60%, #7a2a2a); color: #fff; }
+  .bf-block:first-of-type .bf-grid > .bf-card:first-child .bf-card__media { grid-row: 1 / span 8; background: transparent; }
+  .bf-block:first-of-type .bf-grid > .bf-card:first-child .bf-card__title a, .bf-block:first-of-type .bf-grid > .bf-card:first-child .bf-card__pct, .bf-block:first-of-type .bf-grid > .bf-card:first-child .bf-note { color: #fff; }
+  .bf-block:first-of-type .bf-grid > .bf-card:first-child .bf-price__current { color: #fff; }
+  .bf-block:first-of-type .bf-grid > .bf-card:first-child .bf-price__compare { color: #fff; }
+  .bf-block:first-of-type .bf-grid > .bf-card:first-child .bf-btn { background: #fff; color: var(--bf-orange); }
+  .bf-block:first-of-type .bf-grid > .bf-card:first-child .bf-card__media img { max-height: 380px; }
+  .bf-block:first-of-type .bf-grid > .bf-card:first-child .bf-card__media { grid-row: 1 / span 6; }
+  .bf-carousel { position: relative; display: block; }
+  .bf-track { display: flex; gap: 24px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; padding-bottom: 4px; }
+  .bf-track::-webkit-scrollbar { display: none; }
+  .bf-track > .bf-card { flex: 0 0 min(300px, 80%); scroll-snap-align: start; }
+  .bf-carousel__nav { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+  .bf-arrow { width: 40px; height: 40px; border-radius: 50%; border: 1px solid rgb(255 255 255 / .6); background: transparent; color: #fff; cursor: pointer; font-size: 18px; }
+  .bf-trust { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 24px; }
+  .bf-trust__item { background: rgb(255 255 255 / .12); border-radius: 8px; padding: 28px 20px; text-align: center; }
+  .bf-trust__item h3 { margin: 0 0 8px; font-size: 18px; color: #fff; }
+  .bf-trust__item p { margin: 0; font-size: 14px; }
   @media (max-width: 749px) {
+    .bf-block:first-of-type .bf-grid > .bf-card:first-child { display: flex; }
     .bf-hero { padding: 40px 0 48px; }
     .bf-grid, .bf-grid--bogo { grid-template-columns: 1fr; }
     .bf-signup input { border-radius: 4px; flex-basis: 100%; }
@@ -179,10 +218,26 @@
     { "type": "range", "id": "flagship_limit", "label": "Flagship deals limit", "min": 1, "max": 12, "default": 6 },
     { "type": "collection", "id": "bestsellers_collection", "label": "Bestsellers collection (blank = deals source)" },
     { "type": "range", "id": "bestsellers_limit", "label": "Bestsellers limit", "min": 1, "max": 12, "default": 4 },
+    { "type": "text", "id": "trust_heading", "label": "Trust row heading", "default": "Why shop with us?" },
     { "type": "header", "content": "Klaviyo (leave blank until configured)" },
     { "type": "text", "id": "klaviyo_company_id", "label": "Klaviyo public API key (company ID)" },
     { "type": "text", "id": "klaviyo_list_id", "label": "Klaviyo list ID" }
   ],
-  "presets": [{ "name": "Black Friday demo" }]
+  "blocks": [
+    {
+      "type": "trust",
+      "name": "Trust item",
+      "settings": [
+        { "type": "text", "id": "title", "label": "Title", "default": "Fast shipping" },
+        { "type": "textarea", "id": "text", "label": "Text", "default": "Reliable delivery on all in-stock orders." }
+      ]
+    }
+  ],
+  "presets": [{ "name": "Black Friday demo", "blocks": [
+    { "type": "trust", "settings": { "title": "Fast shipping", "text": "Reliable delivery on all in-stock orders." } },
+    { "type": "trust", "settings": { "title": "Price match", "text": "Contact support to claim a price difference." } },
+    { "type": "trust", "settings": { "title": "Easy returns", "text": "Extended holiday return window." } },
+    { "type": "trust", "settings": { "title": "Warranty", "text": "Hassle-free replacement on eligible items." } }
+  ] }]
 }
 {% endschema %}
