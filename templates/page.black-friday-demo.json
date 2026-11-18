@@ -1,7 +1,60 @@
 {
   "sections": {
-    "main": {
-      "type": "bf-demo",
+    "hero": {
+      "type": "bf-campaign-hero",
+      "settings": {
+        "heading": "Black Friday Demo",
+        "description": "Sign up to be notified when deals go live.",
+        "show_signup": true
+      }
+    },
+    "tabs": {
+      "type": "bf-tabs",
+      "blocks": {
+        "t1": { "type": "tab", "settings": { "label": "Flagship deals", "anchor": "bf-flagship" } },
+        "t2": { "type": "tab", "settings": { "label": "Bestsellers", "anchor": "bf-best" } },
+        "t3": { "type": "tab", "settings": { "label": "BOGO drops", "anchor": "bf-bogo" } }
+      },
+      "block_order": ["t1", "t2", "t3"],
+      "settings": {}
+    },
+    "flagship": {
+      "type": "bf-collection-products",
+      "settings": {
+        "collection": "all",
+        "heading": "Flagship Deals",
+        "description": "Our biggest Black Friday savings.",
+        "anchor": "bf-flagship",
+        "limit": 6,
+        "display": "grid",
+        "featured_first": true,
+        "bg_from": "#5a2a10",
+        "bg_to": "#6b2a1c"
+      }
+    },
+    "bestsellers": {
+      "type": "bf-collection-products",
+      "settings": {
+        "collection": "all",
+        "heading": "Bestsellers",
+        "anchor": "bf-best",
+        "limit": 8,
+        "display": "carousel",
+        "featured_first": false,
+        "bg_from": "#6b2a1c",
+        "bg_to": "#4a1f2e"
+      }
+    },
+    "bogo": {
+      "type": "bf-bogo-offers",
+      "settings": {
+        "heading": "BOGO Drops",
+        "anchor": "bf-bogo",
+        "offer_limit": 6
+      }
+    },
+    "trust": {
+      "type": "bf-trust",
       "blocks": {
         "t1": { "type": "trust", "settings": { "title": "Fast shipping", "text": "Reliable delivery on all in-stock orders." } },
         "t2": { "type": "trust", "settings": { "title": "Price match", "text": "Contact support to claim a price difference." } },
@@ -9,8 +62,8 @@
         "t4": { "type": "trust", "settings": { "title": "Warranty", "text": "Hassle-free replacement on eligible items." } }
       },
       "block_order": ["t1", "t2", "t3", "t4"],
-      "settings": {}
+      "settings": { "heading": "Why shop with us?" }
     }
   },
-  "order": ["main"]
+  "order": ["hero", "tabs", "flagship", "bestsellers", "bogo", "trust"]
 }

@@ -1,0 +1,108 @@
+/* Reusable Black Friday / campaign styles. Shared by the bf-* sections and snippets. */
+.bf-sec { --bf-orange: #ff5f00; --bf-gold: #ffd37a; position: relative; color: #fff; padding: 56px 16px;
+  background: linear-gradient(180deg, var(--bf-from, #4a1f2e), var(--bf-to, #2a1220));
+  box-shadow: 0 0 0 100vmax var(--bf-to, #2a1220); clip-path: inset(0 -100vmax); }
+.bf-sec__in { max-width: 1200px; margin-inline: auto; }
+.bf-sec h2 { scroll-margin-top: calc(var(--header-height, 68px) + 72px); text-align: center; color: var(--bf-gold); font-size: clamp(26px, 4vw, 40px); margin: 0 0 8px; font-weight: 700; }
+.bf-sub { text-align: center; color: var(--bf-gold); margin: 0 0 32px; }
+.bf-sec__empty { text-align: center; opacity: .8; }
+
+/* Hero */
+.bf-hero { position: relative; padding-block: 72px 80px; overflow: hidden; }
+.bf-hero__bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .55; z-index: 0; }
+.bf-hero .bf-sec__in { position: relative; z-index: 1; }
+.bf-hero h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; color: var(--bf-orange); margin: 0 0 12px; font-weight: 800; }
+.bf-hero p { color: #fff; margin: 0; max-width: 520px; }
+.bf-hero .bf-btn { display: inline-block; margin-top: 20px; }
+.bf-countdown { display: flex; gap: 12px; margin-top: 24px; }
+.bf-countdown[hidden] { display: none; }
+.bf-countdown__unit { min-width: 64px; padding: 10px 8px; text-align: center; background: rgb(255 255 255 / .12); border-radius: 6px; }
+.bf-countdown__unit b { display: block; font-size: 26px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.bf-countdown__unit span { font-size: 11px; text-transform: uppercase; opacity: .85; }
+.bf-signup form { display: flex; flex-wrap: wrap; max-width: 520px; margin-top: 20px; }
+.bf-signup input { flex: 1 1 220px; min-width: 0; padding: 14px 16px; border: 0; border-radius: 4px 0 0 4px; background: #fff; color: #2f2f2f; font-size: 14px; }
+.bf-signup .bf-btn { border-radius: 0 4px 4px 0; margin-top: 0; }
+.bf-consent { flex-basis: 100%; font-size: 12px; opacity: .85; margin: 10px 0 0; }
+
+/* Quick-nav tabs (sticky: the section wrapper is flattened so sticky spans the whole page) */
+.shopify-section:has(> .bf-tabs) { display: contents; }
+.bf-tabs { position: sticky; top: var(--header-height, 68px); z-index: 5; display: flex; background: rgb(60 25 10 / .92); backdrop-filter: blur(6px); }
+.bf-tabs a { flex: 1; text-align: center; padding: 16px 8px; color: #fff; text-decoration: none; font-weight: 500; border-bottom: 2px solid transparent; }
+.bf-tabs a:hover, .bf-tabs a:focus-visible { border-bottom-color: #fff; }
+
+/* Grid / cards */
+.bf-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 24px; }
+.bf-grid--bogo { grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); }
+.bf-card, .bf-bogo { position: relative; display: flex; flex-direction: column; gap: 10px; background: #fff; color: #2f2f2f; border-radius: 8px; padding: 20px 16px 16px; overflow: hidden; }
+.bf-card__media { display: block; padding-top: 12px; }
+.bf-card__media img, .bf-bogo img { width: 100%; height: auto; aspect-ratio: 1; object-fit: contain; display: block; }
+.bf-badge { position: absolute; top: 0; left: 0; background: linear-gradient(90deg, #ff9a3c, var(--bf-orange)); color: #fff; padding: 8px 28px 8px 14px; font-size: 16px; font-weight: 800; text-transform: uppercase; clip-path: polygon(0 0, 100% 0, 88% 100%, 0 100%); }
+.bf-badge[hidden] { display: none; }
+.bf-badge--static { position: static; align-self: flex-start; margin: 0; }
+.bf-card__title, .bf-bogo h4, .bf-bogo h3 { font-size: 17px; margin: 0; font-weight: 600; }
+.bf-card__title a, .bf-bogo h4 a { color: inherit; text-decoration: none; }
+.bf-card__price { display: flex; align-items: baseline; font-size: 20px; font-weight: 700; }
+.bf-price__current { color: var(--bf-orange); }
+.bf-price__compare { color: #000; margin-left: 8px; font-weight: 600; order: 2; }
+.bf-price__compare[hidden] { display: none; }
+.bf-card__promo { margin: 0; font-size: 13px; color: var(--bf-orange); font-weight: 600; }
+.bf-card__promo[hidden] { display: none; }
+.bf-note { font-size: 12px; color: #6b6b6b; margin: 0; }
+.bf-select { padding: 10px; width: 100%; border: 1px solid #ddd; border-radius: 6px; background: #fff; color: #2f2f2f; }
+.bf-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: auto; }
+.bf-actions .bf-btn { padding: 12px 6px; font-size: 14px; white-space: nowrap; }
+.bf-btn { padding: 12px 16px; background: var(--bf-orange); color: #fff; border: 1px solid var(--bf-orange); border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 15px; text-align: center; text-decoration: none; }
+.bf-btn--ghost { background: #fff; color: var(--bf-orange); }
+.bf-btn:hover { filter: brightness(1.08); }
+.bf-btn[disabled] { opacity: .5; cursor: not-allowed; }
+.bf-msg { font-size: 13px; min-height: 1em; margin: 0; }
+.bf-hero .bf-msg { color: #fff; }
+.bf-msg[data-state='error'] { color: #d4143a; }
+.bf-msg[data-state='ok'] { color: #0a6b2d; }
+.bf-hero .bf-msg[data-state='error'] { color: #ff8a9b; }
+.bf-hero .bf-msg[data-state='ok'] { color: #7be3a1; }
+
+/* Featured card (first deal / featured product) */
+.bf-card--featured { grid-column: 1 / -1; display: grid; grid-template-columns: 1.3fr 1fr; column-gap: 24px; align-items: center; background: linear-gradient(135deg, #ffb347, #ff5f00 60%, #7a2a2a); color: #fff; }
+.bf-card--featured .bf-card__media { grid-row: 1 / span 7; }
+.bf-card--featured .bf-card__media img { max-height: 380px; }
+.bf-card--featured .bf-card__title a, .bf-card--featured .bf-card__promo, .bf-card--featured .bf-note,
+.bf-card--featured .bf-price__current, .bf-card--featured .bf-price__compare { color: #fff; }
+.bf-card--featured .bf-btn { background: #fff; color: var(--bf-orange); }
+.bf-featured-msg { text-align: center; margin: -16px 0 24px; font-size: 18px; color: #fff; }
+
+/* Carousel */
+.bf-carousel { position: relative; display: block; }
+.bf-track { display: flex; gap: 24px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; padding-bottom: 4px; }
+.bf-track::-webkit-scrollbar { display: none; }
+.bf-track > .bf-card { flex: 0 0 min(300px, 80%); scroll-snap-align: start; }
+.bf-carousel__nav { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.bf-arrow { width: 40px; height: 40px; border-radius: 50%; border: 1px solid rgb(255 255 255 / .6); background: transparent; color: #fff; cursor: pointer; font-size: 18px; }
+
+/* BOGO card */
+.bf-bogo__pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.bf-bogo__rewards { display: flex; flex-direction: column; gap: 10px; }
+.bf-bogo__item { display: flex; flex-direction: column; gap: 6px; position: relative; }
+.bf-bogo__item--pick { cursor: pointer; padding: 6px; border: 2px solid transparent; border-radius: 6px; }
+.bf-bogo__item--pick:has(input:checked) { border-color: var(--bf-orange); }
+.bf-bogo__item--pick input { position: absolute; top: 10px; right: 10px; accent-color: var(--bf-orange); }
+.bf-role { font-size: 12px; text-transform: uppercase; color: #6b6b6b; font-weight: 600; }
+.bf-bogo__item[data-role='reward'] .bf-role { color: var(--bf-orange); }
+.bf-bogo__deal { margin: 0; font-weight: 700; color: var(--bf-orange); }
+
+/* Trust */
+.bf-trust { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 24px; }
+.bf-trust__item { background: rgb(255 255 255 / .12); border-radius: 8px; padding: 28px 20px; text-align: center; }
+.bf-trust__icon { display: block; width: 48px; height: 48px; margin: 0 auto 12px; object-fit: contain; }
+.bf-trust__item h3 { margin: 0 0 8px; font-size: 18px; color: #fff; }
+.bf-trust__item p { margin: 0; font-size: 14px; }
+
+@media (max-width: 749px) {
+  .bf-card--featured { display: flex; }
+  .bf-hero { padding-block: 40px 48px; }
+  .bf-grid, .bf-grid--bogo { grid-template-columns: 1fr; }
+  .bf-signup input { border-radius: 4px; flex-basis: 100%; }
+  .bf-signup .bf-btn { border-radius: 4px; margin-top: 8px; width: 100%; }
+  .bf-tabs a { font-size: 13px; padding: 14px 4px; }
+  .bf-countdown__unit { min-width: 56px; }
+}

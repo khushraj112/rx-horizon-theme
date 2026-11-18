@@ -1,0 +1,74 @@
+{%- doc -%}
+  Reusable BOGO offer card, driven by one "bogo_offer" metaobject entry.
+  Fields: offer_title, display_status, qualifying_product, qualifying_quantity, reward_products (list),
+  reward_quantity, discount_type, discount_value, promotional_label.
+
+  This card only DISPLAYS the offer and adds the products to the cart through the Ajax cart API.
+  It never applies or calculates a discount: the matching native Shopify Buy X Get Y automatic
+  discount must be configured separately in the admin (it is NOT synced from this metaobject).
+
+  @param {metaobject} offer - A bogo_offer metaobject entry
+{%- enddoc -%}
+
+{%- liquid
+  assign q = offer.qualifying_product.value
+  assign rewards = offer.reward_products.value
+  assign q_qty = offer.qualifying_quantity.value | default: 1
+  assign r_qty = offer.reward_quantity.value | default: 1
+  assign dtype = offer.discount_type.value | downcase
+  assign dval = offer.discount_value.value
+  assign dval_int = dval | round
+  assign deal = blank
+  if dval != blank
+    if dtype contains 'percent'
+      if dval_int == dval
+        assign deal = dval_int | append: '% off'
+      else
+        assign deal = dval | append: '% off'
+      endif
+    elsif dtype contains 'fixed'
+      assign dval_cents = dval | times: 100
+      assign deal = dval_cents | money | append: ' off'
+    elsif dtype contains 'free'
+      assign deal = 'Free'
+    endif
+  endif
+-%}
+
+<bf-bogo class="bf-bogo" data-offer="{{ offer.system.handle }}">
+  <h3>{{ offer.offer_title.value }}</h3>
+  {%- if offer.promotional_label.value != blank -%}
+    <p class="bf-badge bf-badge--static">{{ offer.promotional_label.value }}</p>
+  {%- endif -%}
+
+  <div class="bf-bogo__pair">
+    <div class="bf-bogo__item" data-role="qualifying" data-qty="{{ q_qty }}">
+      <span class="bf-role">Buy {{ q_qty }}</span>
+      {% render 'bf-bogo-item', product: q %}
+    </div>
+
+    <div class="bf-bogo__rewards">
+      {%- for r in rewards -%}
+        {%- if rewards.size > 1 -%}
+          <label class="bf-bogo__item bf-bogo__item--pick" data-role="reward" data-qty="{{ r_qty }}">
+            <input type="radio" name="bf-reward-{{ offer.system.handle }}" {% if forloop.first %}checked{% endif %} aria-label="Choose {{ r.title | escape }}">
+            <span class="bf-role">Choose your reward &times;{{ r_qty }}</span>
+            {% render 'bf-bogo-item', product: r %}
+          </label>
+        {%- else -%}
+          <div class="bf-bogo__item" data-role="reward" data-qty="{{ r_qty }}">
+            <span class="bf-role">Get {{ r_qty }}{% if deal != blank %} &middot; {{ deal }}{% endif %}</span>
+            {% render 'bf-bogo-item', product: r %}
+          </div>
+        {%- endif -%}
+      {%- endfor -%}
+    </div>
+  </div>
+
+  {%- if deal != blank and rewards.size > 1 -%}
+    <p class="bf-bogo__deal">Reward: {{ deal }}</p>
+  {%- endif -%}
+  <p class="bf-note">The reward price is applied by Shopify's automatic discount once the qualifying and reward items are in the cart.</p>
+  <button type="button" class="bf-btn" data-bf-add-both>Add Both Products</button>
+  <p class="bf-msg" data-bf-msg role="status" aria-live="polite"></p>
+</bf-bogo>

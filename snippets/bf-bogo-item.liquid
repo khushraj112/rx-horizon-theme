@@ -1,0 +1,28 @@
+{%- doc -%}
+  Image, title, native price and variant select for one product inside a BOGO card.
+
+  @param {product} product - The product to render
+{%- enddoc -%}
+
+{%- liquid
+  assign sv = product.selected_or_first_available_variant
+-%}
+<a href="{{ product.url }}">{{ product.featured_image | image_url: width: 400 | image_tag: loading: 'lazy', alt: product.title }}</a>
+<h4><a href="{{ product.url }}">{{ product.title }}</a></h4>
+<div class="bf-card__price">
+  <s class="bf-price__compare" data-bf-compare {% unless sv.compare_at_price > sv.price %}hidden{% endunless %}>{% if sv.compare_at_price > sv.price %}{{ sv.compare_at_price | money }}{% endif %}</s>
+  <span class="bf-price__current" data-bf-current>{{ sv.price | money }}</span>
+</div>
+<select class="bf-select" data-bf-variant aria-label="{{ product.title | escape }} variant">
+  {%- for variant in product.variants -%}
+    <option
+      value="{{ variant.id }}"
+      data-price="{{ variant.price | money }}"
+      data-compare="{% if variant.compare_at_price > variant.price %}{{ variant.compare_at_price | money }}{% endif %}"
+      {% unless variant.available %}disabled{% endunless %}
+      {% if variant.id == sv.id %}selected{% endif %}
+    >
+      {{ variant.title }}{% unless variant.available %} (sold out){% endunless %} &ndash; {{ variant.price | money }}
+    </option>
+  {%- endfor -%}
+</select>

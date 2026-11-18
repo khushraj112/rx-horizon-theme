@@ -30,21 +30,31 @@ function say(el, text, state) {
   el.dataset.state = state || '';
 }
 
+/** Sync price / compare-at / % off display from the selected <option> data attributes. */
+function syncPrice(root, option) {
+  if (!option) return;
+  const cur = root.querySelector('[data-bf-current]');
+  const cmp = root.querySelector('[data-bf-compare]');
+  const badge = root.querySelector('[data-bf-badge]');
+  if (cur && option.dataset.price) cur.textContent = option.dataset.price;
+  if (cmp) {
+    cmp.textContent = option.dataset.compare || '';
+    cmp.hidden = !option.dataset.compare;
+  }
+  if (badge) {
+    const pct = Number(option.dataset.pct || 0);
+    badge.textContent = `${pct}% off`;
+    badge.hidden = !pct;
+  }
+}
+
 class BfCard extends HTMLElement {
   connectedCallback() {
     this.select = this.querySelector('[data-bf-variant]');
-    this.select?.addEventListener('change', () => this.#syncPrice());
-    this.querySelector('[data-bf-add]')?.addEventListener('click', (e) => this.#add(e.currentTarget));
-  }
-  #syncPrice() {
-    const o = this.select.selectedOptions[0];
-    const cur = this.querySelector('[data-bf-current]');
-    const cmp = this.querySelector('[data-bf-compare]');
-    if (cur) cur.textContent = o.dataset.price;
-    if (cmp) {
-      cmp.textContent = o.dataset.compare || '';
-      cmp.hidden = !o.dataset.compare;
+    if (this.select?.tagName === 'SELECT') {
+      this.select.addEventListener('change', () => syncPrice(this, this.select.selectedOptions[0]));
     }
+    this.querySelector('[data-bf-add]')?.addEventListener('click', (e) => this.#add(e.currentTarget));
   }
   async #add(btn) {
     const msg = this.querySelector('[data-bf-msg]');
@@ -63,24 +73,22 @@ class BfCard extends HTMLElement {
 class BfBogo extends HTMLElement {
   connectedCallback() {
     this.querySelectorAll('[data-bf-variant]').forEach((s) =>
-      s.addEventListener('change', () => {
-        const cur = s.closest('.bf-bogo__item').querySelector('[data-bf-current]');
-        if (cur) cur.textContent = s.selectedOptions[0].dataset.price;
-      })
+      s.addEventListener('change', () => syncPrice(s.closest('.bf-bogo__item'), s.selectedOptions[0]))
     );
     this.querySelector('[data-bf-add-both]')?.addEventListener('click', (e) => this.#addBoth(e.currentTarget));
   }
   async #addBoth(btn) {
     const msg = this.querySelector('[data-bf-msg]');
-    const q = this.querySelector('[data-role="qualifying"] [data-bf-variant]').value;
-    const r = this.querySelector('[data-role="reward"] [data-bf-variant]').value;
+    const q = this.querySelector('[data-role="qualifying"]');
+    const rewards = [...this.querySelectorAll('[data-role="reward"]')];
+    const r = rewards.find((el) => el.querySelector('input[type="radio"]')?.checked) || rewards[0];
     btn.disabled = true;
     try {
-      // Single request, both variants. Shopify validates and applies the BOGO discount.
+      // One request, both variants, quantities from the offer. Shopify validates and applies the BOGO discount.
       await addToCart(
         [
-          { id: Number(q), quantity: 1 },
-          { id: Number(r), quantity: 1 },
+          { id: Number(q.querySelector('[data-bf-variant]').value), quantity: Number(q.dataset.qty) || 1 },
+          { id: Number(r.querySelector('[data-bf-variant]').value), quantity: Number(r.dataset.qty) || 1 },
         ],
         this.dataset.offer
       );
@@ -92,6 +100,29 @@ class BfBogo extends HTMLElement {
     }
   }
 }
+
+class BfCountdown extends HTMLElement {
+  connectedCallback() {
+    const end = new Date((this.dataset.end || '').replace(' ', 'T')).getTime();
+    if (Number.isNaN(end)) return;
+    const set = (k, v) => (this.querySelector(`[data-${k}]`).textContent = String(v));
+    const tick = () => {
+      const left = Math.max(0, end - Date.now());
+      this.hidden = left === 0;
+      set('d', Math.floor(left / 864e5));
+      set('h', Math.floor((left % 864e5) / 36e5));
+      set('m', Math.floor((left % 36e5) / 6e4));
+      set('s', Math.floor((left % 6e4) / 1e3));
+      if (left === 0) clearInterval(this.timer);
+    };
+    tick();
+    this.timer = setInterval(tick, 1000);
+  }
+  disconnectedCallback() {
+    clearInterval(this.timer);
+  }
+}
+if (!customElements.get('bf-countdown')) customElements.define('bf-countdown', BfCountdown);
 
 /** Email signup via Klaviyo's public client Subscriptions API (no custom backend/storage).
  *  Requires a public company ID + list ID configured in the section settings. */

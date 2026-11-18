@@ -1,0 +1,53 @@
+{%- comment -%}
+  BOGO Offers Section: lists published "bogo_offer" metaobject entries with display_status = true.
+  Display only. The matching native Shopify automatic discount must be configured separately.
+{%- endcomment -%}
+
+{{ 'bf-campaign.css' | asset_url | stylesheet_tag }}
+
+{%- if section.settings.enabled -%}
+  <div class="bf-sec" style="--bf-from: {{ section.settings.bg_from }}; --bf-to: {{ section.settings.bg_to }};">
+    <div class="bf-sec__in">
+      {%- if section.settings.heading != blank -%}
+        <h2 {% if section.settings.anchor != blank %}id="{{ section.settings.anchor | handleize }}"{% endif %}>{{ section.settings.heading }}</h2>
+      {%- endif -%}
+      {%- if section.settings.description != blank -%}
+        <p class="bf-sub">{{ section.settings.description }}</p>
+      {%- endif -%}
+
+      <div class="bf-grid bf-grid--bogo">
+        {%- assign shown = 0 -%}
+        {%- for offer in shop.metaobjects.bogo_offer.values -%}
+          {%- if shown < section.settings.offer_limit
+            and offer.display_status.value == true
+            and offer.qualifying_product.value != blank
+            and offer.reward_products.value.size > 0
+          -%}
+            {% render 'bf-bogo-card', offer: offer %}
+            {%- assign shown = shown | plus: 1 -%}
+          {%- endif -%}
+        {%- endfor -%}
+      </div>
+      {%- if shown == 0 -%}
+        <p class="bf-sec__empty">No active BOGO offers right now.</p>
+      {%- endif -%}
+    </div>
+  </div>
+  <script src="{{ 'bf-demo.js' | asset_url }}" type="module" async></script>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "BOGO offers",
+  "settings": [
+    { "type": "checkbox", "id": "enabled", "label": "Show section", "default": true },
+    { "type": "text", "id": "heading", "label": "Heading", "default": "BOGO Drops" },
+    { "type": "textarea", "id": "description", "label": "Description" },
+    { "type": "text", "id": "anchor", "label": "Anchor ID", "info": "Used by the Campaign tabs, e.g. bf-bogo." },
+    { "type": "range", "id": "offer_limit", "label": "Max offers", "min": 1, "max": 12, "default": 6 },
+    { "type": "color", "id": "bg_from", "label": "Background gradient: top", "default": "#4a1f2e" },
+    { "type": "color", "id": "bg_to", "label": "Background gradient: bottom", "default": "#2a1220" }
+  ],
+  "presets": [{ "name": "BOGO offers" }]
+}
+{% endschema %}

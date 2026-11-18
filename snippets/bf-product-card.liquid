@@ -1,57 +1,65 @@
 {%- doc -%}
-  Black Friday demo product card (functional, minimal styling).
-  Reads custom.sale_label / custom.sale_percentage metafields dynamically.
-  Shopify pricing only: native automatic discounts are applied in the cart, never calculated here.
+  Reusable campaign product card.
+  Pricing is 100% native: price = current price, compare_at_price = original (strikethrough).
+  The "% off" badge is computed from those two values per variant. Automatic discounts are never
+  calculated here (they are applied by Shopify in cart/checkout). The optional custom.promotion_label
+  metafield is display-only text and is never used for any calculation.
 
   @param {product} product - The product to render
+  @param {boolean} [featured] - Render as the large featured card
+  @param {boolean} [show_promo] - Show the promotion label (default true)
 {%- enddoc -%}
 
 {%- liquid
-  assign sale_label = product.metafields.custom.sale_label.value
-  assign sale_pct = product.metafields.custom.sale_percentage.value
   assign first_variant = product.selected_or_first_available_variant
-  assign compare = first_variant.compare_at_price
+  assign promo = product.metafields.custom.promotion_label.value
+  if show_promo == false
+    assign promo = blank
+  endif
+  assign pct = 0
+  if first_variant.compare_at_price > first_variant.price
+    assign pct = first_variant.compare_at_price | minus: first_variant.price | times: 100.0 | divided_by: first_variant.compare_at_price | round
+  endif
 -%}
 
-<bf-card class="bf-card" data-product-id="{{ product.id }}" data-product-handle="{{ product.handle }}">
+<bf-card class="bf-card{% if featured %} bf-card--featured{% endif %}" data-product-id="{{ product.id }}" data-product-handle="{{ product.handle }}">
   <a class="bf-card__media" href="{{ product.url }}">
     {%- if product.featured_image -%}
       {{ product.featured_image | image_url: width: 600 | image_tag: loading: 'lazy', widths: '300, 450, 600', sizes: '(min-width: 750px) 25vw, 50vw', alt: product.title }}
     {%- endif -%}
-    {%- if sale_label != blank -%}
-      <span class="bf-badge" data-bf-label>{{ sale_label }}</span>
-    {%- endif -%}
+    <span class="bf-badge" data-bf-badge {% if pct == 0 %}hidden{% endif %}>{{ pct }}% off</span>
   </a>
   <h3 class="bf-card__title"><a href="{{ product.url }}">{{ product.title }}</a></h3>
 
   <div class="bf-card__price" data-bf-price>
-    {%- if compare > first_variant.price -%}
-      <s class="bf-price__compare" data-bf-compare>{{ compare | money }}</s>
-    {%- else -%}
-      <s class="bf-price__compare" data-bf-compare hidden></s>
-    {%- endif -%}
+    <s class="bf-price__compare" data-bf-compare {% if pct == 0 %}hidden{% endif %}>{% if pct > 0 %}{{ first_variant.compare_at_price | money }}{% endif %}</s>
     <span class="bf-price__current" data-bf-current>{{ first_variant.price | money }}</span>
   </div>
 
-  {%- if sale_pct != blank -%}
-    <p class="bf-card__pct" data-bf-pct>
-      {{ sale_pct }}% off &middot; <span class="bf-note">discount applied automatically in cart</span>
-    </p>
-  {%- endif -%}
+  <p class="bf-card__promo" data-bf-promo {% if promo == blank %}hidden{% endif %}>{{ promo }}</p>
 
-  <select class="bf-select" data-bf-variant aria-label="{{ product.title | escape }} variant">
-    {%- for variant in product.variants -%}
-      <option
-        value="{{ variant.id }}"
-        data-price="{{ variant.price | money }}"
-        data-compare="{% if variant.compare_at_price > variant.price %}{{ variant.compare_at_price | money }}{% endif %}"
-        {% unless variant.available %}disabled{% endunless %}
-        {% if variant.id == first_variant.id %}selected{% endif %}
-      >
-        {{ variant.title }}{% unless variant.available %} (sold out){% endunless %} &ndash; {{ variant.price | money }}
-      </option>
-    {%- endfor -%}
-  </select>
+  {%- if product.variants.size > 1 -%}
+    <select class="bf-select" data-bf-variant aria-label="{{ product.title | escape }} variant">
+      {%- for variant in product.variants -%}
+        {%- assign v_pct = 0 -%}
+        {%- if variant.compare_at_price > variant.price -%}
+          {%- assign v_pct = variant.compare_at_price | minus: variant.price | times: 100.0 | divided_by: variant.compare_at_price | round -%}
+        {%- endif -%}
+        <option
+          value="{{ variant.id }}"
+          data-price="{{ variant.price | money }}"
+          data-compare="{% if v_pct > 0 %}{{ variant.compare_at_price | money }}{% endif %}"
+          data-pct="{{ v_pct }}"
+          {% unless variant.available %}disabled{% endunless %}
+          {% if variant.id == first_variant.id %}selected{% endif %}
+        >
+          {{ variant.title }}{% unless variant.available %} (sold out){% endunless %} &ndash; {{ variant.price | money }}
+        </option>
+      {%- endfor -%}
+    </select>
+  {%- else -%}
+    <input type="hidden" data-bf-variant value="{{ first_variant.id }}">
+  {%- endif -%}
 
   <div class="bf-actions">
     <button type="button" class="bf-btn" data-bf-add {% unless product.available %}disabled{% endunless %}>

@@ -1,0 +1,34 @@
+{%- comment -%}
+  Sticky quick-nav for a campaign page. Each tab links to the "Anchor ID" set on another bf-* section.
+{%- endcomment -%}
+
+{{ 'bf-campaign.css' | asset_url | stylesheet_tag }}
+
+{%- if section.settings.enabled and section.blocks.size > 0 -%}
+  <nav class="bf-tabs" aria-label="{{ section.settings.aria_label | escape }}">
+    {%- for block in section.blocks -%}
+      <a href="#{{ block.settings.anchor | handleize }}" {{ block.shopify_attributes }}>{{ block.settings.label }}</a>
+    {%- endfor -%}
+  </nav>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "Campaign tabs",
+  "settings": [
+    { "type": "checkbox", "id": "enabled", "label": "Show section", "default": true },
+    { "type": "text", "id": "aria_label", "label": "Accessible label", "default": "Campaign sections" }
+  ],
+  "blocks": [
+    {
+      "type": "tab",
+      "name": "Tab",
+      "settings": [
+        { "type": "text", "id": "label", "label": "Label", "default": "Deals" },
+        { "type": "text", "id": "anchor", "label": "Anchor ID", "info": "Must match the Anchor ID of the target section." }
+      ]
+    }
+  ],
+  "presets": [{ "name": "Campaign tabs" }]
+}
+{% endschema %}

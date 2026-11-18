@@ -1,0 +1,58 @@
+{%- comment -%}
+  Trust Section: editable heading plus trust items (title, text, optional icon image).
+{%- endcomment -%}
+
+{{ 'bf-campaign.css' | asset_url | stylesheet_tag }}
+
+{%- if section.settings.enabled and section.blocks.size > 0 -%}
+  <div class="bf-sec" style="--bf-from: {{ section.settings.bg_from }}; --bf-to: {{ section.settings.bg_to }};">
+    <div class="bf-sec__in">
+      {%- if section.settings.heading != blank -%}
+        <h2>{{ section.settings.heading }}</h2>
+      {%- endif -%}
+      <div class="bf-trust">
+        {%- for block in section.blocks -%}
+          <div class="bf-trust__item" {{ block.shopify_attributes }}>
+            {%- if block.settings.icon != blank -%}
+              {{ block.settings.icon | image_url: width: 96 | image_tag: class: 'bf-trust__icon', loading: 'lazy', alt: '' }}
+            {%- endif -%}
+            <h3>{{ block.settings.title }}</h3>
+            <p>{{ block.settings.text }}</p>
+          </div>
+        {%- endfor -%}
+      </div>
+    </div>
+  </div>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "Trust row",
+  "settings": [
+    { "type": "checkbox", "id": "enabled", "label": "Show section", "default": true },
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Why shop with us?" },
+    { "type": "color", "id": "bg_from", "label": "Background gradient: top", "default": "#2a1220" },
+    { "type": "color", "id": "bg_to", "label": "Background gradient: bottom", "default": "#1a0a10" }
+  ],
+  "blocks": [
+    {
+      "type": "trust",
+      "name": "Trust item",
+      "settings": [
+        { "type": "image_picker", "id": "icon", "label": "Icon (optional)" },
+        { "type": "text", "id": "title", "label": "Title", "default": "Fast shipping" },
+        { "type": "textarea", "id": "text", "label": "Text", "default": "Reliable delivery on all in-stock orders." }
+      ]
+    }
+  ],
+  "presets": [{
+    "name": "Trust row",
+    "blocks": [
+      { "type": "trust", "settings": { "title": "Fast shipping", "text": "Reliable delivery on all in-stock orders." } },
+      { "type": "trust", "settings": { "title": "Price match", "text": "Contact support to claim a price difference." } },
+      { "type": "trust", "settings": { "title": "Easy returns", "text": "Extended holiday return window." } },
+      { "type": "trust", "settings": { "title": "Warranty", "text": "Hassle-free replacement on eligible items." } }
+    ]
+  }]
+}
+{% endschema %}
