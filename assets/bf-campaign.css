@@ -114,3 +114,5 @@
 .bf-card__campaign { margin: 0; font-size: 12px; font-style: italic; color: #6b6b6b; }
 .bf-card--featured .bf-price__tag, .bf-card--featured .bf-card__campaign { color: var(--bf-gold); }
 .bf-cell { display: contents; }
+
+.bf-bogo__headline { margin: 0; font-size: 13px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--bf-orange); }

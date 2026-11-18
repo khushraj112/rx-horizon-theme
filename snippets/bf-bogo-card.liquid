@@ -1,45 +1,57 @@
 {%- doc -%}
-  Reusable BOGO offer card, driven by one "bogo_offer" metaobject entry.
-  Fields: offer_title, display_status, qualifying_product, qualifying_quantity, reward_products (list),
-  reward_quantity, discount_type, discount_value, promotional_label.
+  Reusable BOGO offer card, driven by explicit values from one "BOGO Offer" Theme Editor block.
 
   This card only DISPLAYS the offer and adds the products to the cart through the Ajax cart API.
   It never applies or calculates a discount: the matching native Shopify Buy X Get Y automatic
-  discount must be configured separately in the admin (it is NOT synced from this metaobject).
+  discount must be configured separately in the admin (it is NOT synced with these settings).
 
-  @param {metaobject} offer - A bogo_offer metaobject entry
-  @param {string} [note] - Editable pre-launch message
+  @param {string} uid - Unique id for this offer (block id)
+  @param {string} [title] - Offer title
+  @param {product} qualifying - Qualifying product
+  @param {product} reward_1 - First reward product (required)
+  @param {product} [reward_2] - Optional alternative reward
+  @param {product} [reward_3] - Optional alternative reward
+  @param {number} [q_qty] - Qualifying quantity
+  @param {number} [r_qty] - Reward quantity
+  @param {string} [dtype] - 'percentage' or 'fixed'
+  @param {number} [dval] - Discount value shown as information only
+  @param {string} [label] - Promotional label
+  @param {string} [note] - Pre-launch message
 {%- enddoc -%}
 
 {%- liquid
-  assign q = offer.qualifying_product.value
-  assign rewards = offer.reward_products.value
-  assign q_qty = offer.qualifying_quantity.value | default: 1
-  assign r_qty = offer.reward_quantity.value | default: 1
-  assign dtype = offer.discount_type.value | downcase
-  assign dval = offer.discount_value.value
+  assign q = qualifying
+  assign reward_count = 1
+  if reward_2 != blank
+    assign reward_count = reward_count | plus: 1
+  endif
+  if reward_3 != blank
+    assign reward_count = reward_count | plus: 1
+  endif
+  assign slots = '1,2,3' | split: ','
+  assign q_qty = q_qty | default: 1
+  assign r_qty = r_qty | default: 1
   assign dval_int = dval | round
   assign deal = blank
-  if dval != blank
-    if dtype contains 'percent'
-      if dval_int == dval
-        assign deal = dval_int | append: '% off'
-      else
-        assign deal = dval | append: '% off'
-      endif
-    elsif dtype contains 'fixed'
+  if dval != blank and dval > 0
+    if dtype == 'fixed'
       assign dval_cents = dval | times: 100
       assign deal = dval_cents | money | append: ' off'
-    elsif dtype contains 'free'
+    elsif dval >= 100
       assign deal = 'Free'
+    elsif dval_int == dval
+      assign deal = dval_int | append: '% off'
+    else
+      assign deal = dval | append: '% off'
     endif
   endif
 -%}
 
-<bf-bogo class="bf-bogo" data-offer="{{ offer.system.handle }}">
-  <h3>{{ offer.offer_title.value }}</h3>
-  {%- if offer.promotional_label.value != blank -%}
-    <p class="bf-badge bf-badge--static">{{ offer.promotional_label.value }}</p>
+<bf-bogo class="bf-bogo" data-offer="{{ uid }}">
+  <p class="bf-bogo__headline">Buy {{ q_qty }} get {{ r_qty }}{% if deal != blank %} &mdash; {{ deal | upcase }}{% endif %}</p>
+  {%- if title != blank -%}<h3>{{ title }}</h3>{%- endif -%}
+  {%- if label != blank -%}
+    <p class="bf-badge bf-badge--static">{{ label }}</p>
   {%- endif -%}
 
   <div class="bf-bogo__pair">
@@ -49,10 +61,21 @@
     </div>
 
     <div class="bf-bogo__rewards">
-      {%- for r in rewards -%}
-        {%- if rewards.size > 1 -%}
+      {%- for slot in slots -%}
+        {%- liquid
+          case slot
+            when '1'
+              assign r = reward_1
+            when '2'
+              assign r = reward_2
+            else
+              assign r = reward_3
+          endcase
+        -%}
+        {%- if r != blank -%}
+        {%- if reward_count > 1 -%}
           <label class="bf-bogo__item bf-bogo__item--pick" data-role="reward" data-qty="{{ r_qty }}">
-            <input type="radio" name="bf-reward-{{ offer.system.handle }}" {% if forloop.first %}checked{% endif %} aria-label="Choose {{ r.title | escape }}">
+            <input type="radio" name="bf-reward-{{ uid }}" {% if forloop.first %}checked{% endif %} aria-label="Choose {{ r.title | escape }}">
             <span class="bf-role">Choose your reward &times;{{ r_qty }}</span>
             {% render 'bf-bogo-item', product: r %}
           </label>
@@ -62,11 +85,12 @@
             {% render 'bf-bogo-item', product: r %}
           </div>
         {%- endif -%}
+        {%- endif -%}
       {%- endfor -%}
     </div>
   </div>
 
-  {%- if deal != blank and rewards.size > 1 -%}
+  {%- if deal != blank and reward_count > 1 -%}
     <p class="bf-bogo__deal">Reward: {{ deal }}</p>
   {%- endif -%}
   {%- if note != blank -%}<p class="bf-note">{{ note }}</p>{%- endif -%}

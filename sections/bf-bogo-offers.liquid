@@ -1,6 +1,7 @@
 {%- comment -%}
-  BOGO Offers Section: lists published "bogo_offer" metaobject entries with display_status = true.
-  Display only. The matching native Shopify automatic discount must be configured separately.
+  BOGO Offers Section: each "BOGO Offer" block is one offer, managed in the Theme Editor.
+  Display only. The matching native Shopify Buy X Get Y automatic discount must be configured separately
+  in the admin: these settings are NOT synced with it and never calculate or apply a discount.
 {%- endcomment -%}
 
 {{ 'bf-campaign.css' | asset_url | stylesheet_tag }}
@@ -14,21 +15,26 @@
       {%- if section.settings.description != blank -%}
         <p class="bf-sub">{{ section.settings.description }}</p>
       {%- endif -%}
+      {%- if section.settings.announcement != blank -%}
+        <p class="bf-announce">{{ section.settings.announcement }}</p>
+      {%- endif -%}
 
       <div class="bf-grid bf-grid--bogo">
         {%- assign shown = 0 -%}
-        {%- for offer in shop.metaobjects.bogo_offer.values -%}
-          {%- if shown < section.settings.offer_limit
-            and offer.display_status.value == true
-            and offer.qualifying_product.value != blank
-            and offer.reward_products.value.size > 0
-          -%}
-            {% render 'bf-bogo-card', offer: offer, note: section.settings.prelaunch_message %}
+        {%- for block in section.blocks -%}
+          {%- assign b = block.settings -%}
+          {%- assign offer_note = b.prelaunch_message | default: section.settings.prelaunch_message -%}
+          {%- if b.show_offer and shown < section.settings.offer_limit and b.qualifying_product != blank and b.reward_product != blank -%}
+            <div class="bf-cell" {{ block.shopify_attributes }}>
+              {% render 'bf-bogo-card', uid: block.id, title: b.title, qualifying: b.qualifying_product, reward_1: b.reward_product, reward_2: b.reward_product_2, reward_3: b.reward_product_3, q_qty: b.qualifying_quantity, r_qty: b.reward_quantity, dtype: b.discount_type, dval: b.discount_value, label: b.promo_label, note: offer_note %}
+            </div>
             {%- assign shown = shown | plus: 1 -%}
+          {%- elsif request.design_mode -%}
+            <div class="bf-cell" {{ block.shopify_attributes }}><p class="bf-sec__empty">{% if b.show_offer == false %}Offer hidden.{% else %}Select a qualifying and a reward product.{% endif %}</p></div>
           {%- endif -%}
         {%- endfor -%}
       </div>
-      {%- if shown == 0 -%}
+      {%- if shown == 0 and request.design_mode == false -%}
         <p class="bf-sec__empty">{{ section.settings.empty_message }}</p>
       {%- endif -%}
     </div>
@@ -43,13 +49,40 @@
     { "type": "checkbox", "id": "enabled", "label": "Show section", "default": true },
     { "type": "text", "id": "heading", "label": "Heading", "default": "Buy one, get one" },
     { "type": "textarea", "id": "description", "label": "Description" },
-    { "type": "text", "id": "anchor", "label": "Anchor ID", "info": "Used by the Campaign tabs, e.g. bf-bogo." },
-    { "type": "range", "id": "offer_limit", "label": "Max offers", "min": 1, "max": 12, "default": 6 },
-    { "type": "text", "id": "prelaunch_message", "label": "Pre-launch message", "default": "Offer applicable when the campaign starts.", "info": "Shown on every offer. The real discount comes from your Shopify Buy X Get Y discount, which is NOT synced with the BOGO Offer entries." },
+    { "type": "text", "id": "announcement", "label": "Pre-launch announcement", "info": "Optional line shown above the offers, e.g. Offers start Black Friday." },
+    { "type": "text", "id": "anchor", "label": "Anchor ID", "info": "Used by the Campaign tabs, e.g. bogo." },
+    { "type": "range", "id": "offer_limit", "label": "Max offers shown", "min": 1, "max": 12, "default": 6 },
+    { "type": "text", "id": "prelaunch_message", "label": "Default pre-launch message", "default": "Offer applicable when the campaign starts.", "info": "Used by any offer that has no message of its own." },
     { "type": "text", "id": "empty_message", "label": "Message when there are no offers", "default": "No active offers right now." },
     { "type": "color", "id": "bg_from", "label": "Background gradient: top", "default": "#4a1f2e" },
     { "type": "color", "id": "bg_to", "label": "Background gradient: bottom", "default": "#2a1220" }
   ],
-  "presets": [{ "name": "BOGO offers" }]
+  "blocks": [
+    {
+      "type": "offer",
+      "name": "BOGO Offer",
+      "limit": 12,
+      "settings": [
+        { "type": "paragraph", "content": "Display only. Create the matching Buy X Get Y automatic discount in Shopify admin: it is NOT synced with these settings." },
+        { "type": "text", "id": "title", "label": "Offer title", "default": "Buy one, get one" },
+        { "type": "product", "id": "qualifying_product", "label": "Qualifying product (customer buys)" },
+        { "type": "range", "id": "qualifying_quantity", "label": "Qualifying quantity", "min": 1, "max": 10, "step": 1, "default": 1 },
+        { "type": "product", "id": "reward_product", "label": "Reward product" },
+        { "type": "product", "id": "reward_product_2", "label": "Alternative reward product 2 (optional)", "info": "When set, customers choose one reward." },
+        { "type": "product", "id": "reward_product_3", "label": "Alternative reward product 3 (optional)" },
+        { "type": "range", "id": "reward_quantity", "label": "Reward quantity", "min": 1, "max": 10, "step": 1, "default": 1 },
+        { "type": "select", "id": "discount_type", "label": "Discount type (display only)", "default": "percentage", "options": [
+          { "value": "percentage", "label": "Percentage" },
+          { "value": "fixed", "label": "Fixed amount" }
+        ] },
+        { "type": "number", "id": "discount_value", "label": "Discount value", "default": 50, "info": "Percent, or an amount in store currency. 100 percent shows Free." },
+        { "type": "text", "id": "promo_label", "label": "Promotional label", "default": "BOGO" },
+        { "type": "text", "id": "prelaunch_message", "label": "Pre-launch message", "info": "Leave blank to use the section default." },
+        { "type": "checkbox", "id": "show_offer", "label": "Show offer", "default": true }
+      ]
+    }
+  ],
+  "max_blocks": 12,
+  "presets": [{ "name": "BOGO offers", "blocks": [{ "type": "offer" }] }]
 }
 {% endschema %}

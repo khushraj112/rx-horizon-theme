@@ -167,7 +167,26 @@
         "heading": "BOGO Drops",
         "anchor": "bf-bogo",
         "offer_limit": 6
-      }
+      },
+      "blocks": {
+        "o1": {
+          "type": "offer",
+          "settings": {
+            "title": "Clicker Ring + Nose Ring",
+            "qualifying_product": "bf-925-sterling-silver-double-row-segment-clicker-ring",
+            "qualifying_quantity": 1,
+            "reward_product": "bf-925-sterling-silver-laser-cut-nose-ring",
+            "reward_quantity": 1,
+            "discount_type": "percentage",
+            "discount_value": 50,
+            "promo_label": "BOGO 50% off",
+            "show_offer": true
+          }
+        }
+      },
+      "block_order": [
+        "o1"
+      ]
     },
     "trust": {
       "type": "bf-trust",
