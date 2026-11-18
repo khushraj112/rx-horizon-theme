@@ -30,22 +30,27 @@ function say(el, text, state) {
   el.dataset.state = state || '';
 }
 
-/** Sync price / compare-at / % off display from the selected <option> data attributes. */
+/** Sync price / compare-at / badge / campaign note from the selected <option> data attributes.
+ *  Display only: the cart always receives the variant id, never a displayed price. */
 function syncPrice(root, option) {
   if (!option) return;
   const cur = root.querySelector('[data-bf-current]');
   const cmp = root.querySelector('[data-bf-compare]');
   const badge = root.querySelector('[data-bf-badge]');
+  const tag = root.querySelector('[data-bf-tag]');
+  const note = root.querySelector('[data-bf-note]');
+  const campaign = option.dataset.mode === 'campaign';
   if (cur && option.dataset.price) cur.textContent = option.dataset.price;
   if (cmp) {
     cmp.textContent = option.dataset.compare || '';
     cmp.hidden = !option.dataset.compare;
   }
   if (badge) {
-    const pct = Number(option.dataset.pct || 0);
-    badge.textContent = `${pct}% off`;
-    badge.hidden = !pct;
+    badge.textContent = option.dataset.badge || '';
+    badge.hidden = !option.dataset.badge;
   }
+  if (tag) tag.hidden = !campaign || !tag.textContent.trim();
+  if (note) note.hidden = !campaign || !note.textContent.trim();
 }
 
 class BfCard extends HTMLElement {
@@ -149,7 +154,7 @@ class BfSignup extends HTMLElement {
             type: 'subscription',
             attributes: {
               profile: { data: { type: 'profile', attributes: { email } } },
-              custom_source: 'Black Friday Demo',
+              custom_source: this.dataset.source || 'Campaign page',
             },
             relationships: { list: { data: { type: 'list', id: listId } } },
           },

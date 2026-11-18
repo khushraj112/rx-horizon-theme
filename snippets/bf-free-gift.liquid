@@ -1,0 +1,40 @@
+{%- doc -%}
+  Informational free-gift callout for a product. Renders nothing unless the product's
+  custom.free_gift_product (product reference) metafield is set.
+
+  Display only: nothing is added to the cart. The actual free gift must be configured in Shopify as a
+  native discount (e.g. Buy X Get Y at 100% off). It is NOT synchronized with this metafield.
+
+  @param {product} product - The product that carries the gift
+  @param {string} [message] - Editable message; "[gift]" is replaced with the gift product title
+{%- enddoc -%}
+
+{%- liquid
+  assign gift = product.metafields.custom.free_gift_product.value
+  assign msg = message | default: 'Buy this product and receive [gift] FREE when the campaign starts.'
+-%}
+
+{%- if gift != blank -%}
+  <div class="bf-gift">
+    {%- if gift.featured_image -%}
+      <a class="bf-gift__img" href="{{ gift.url }}">
+        {{ gift.featured_image | image_url: width: 160 | image_tag: loading: 'lazy', widths: '80, 120, 160', sizes: '64px', alt: gift.title }}
+      </a>
+    {%- endif -%}
+    <div class="bf-gift__body">
+      <span class="bf-gift__tag">Free</span>
+      <p class="bf-gift__msg">{{ msg | replace: '[gift]', gift.title }}</p>
+      <a class="bf-gift__name" href="{{ gift.url }}">{{ gift.title }}</a>
+    </div>
+  </div>
+{%- endif -%}
+
+{% stylesheet %}
+  .bf-gift { display: flex; gap: 14px; align-items: center; padding: 12px; border: 1px dashed #ff5f00; border-radius: 8px; }
+  .bf-gift__img { flex: 0 0 64px; }
+  .bf-gift__img img { width: 64px; height: 64px; object-fit: cover; border-radius: 6px; display: block; }
+  .bf-gift__body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .bf-gift__tag { align-self: flex-start; background: #ff5f00; color: #fff; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; padding: 2px 8px; border-radius: 3px; }
+  .bf-gift__msg { margin: 0; font-size: 14px; }
+  .bf-gift__name { font-size: 13px; font-weight: 600; text-decoration: underline; color: inherit; }
+{% endstylesheet %}

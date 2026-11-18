@@ -8,6 +8,7 @@
   discount must be configured separately in the admin (it is NOT synced from this metaobject).
 
   @param {metaobject} offer - A bogo_offer metaobject entry
+  @param {string} [note] - Editable pre-launch message
 {%- enddoc -%}
 
 {%- liquid
@@ -68,7 +69,7 @@
   {%- if deal != blank and rewards.size > 1 -%}
     <p class="bf-bogo__deal">Reward: {{ deal }}</p>
   {%- endif -%}
-  <p class="bf-note">The reward price is applied by Shopify's automatic discount once the qualifying and reward items are in the cart.</p>
+  {%- if note != blank -%}<p class="bf-note">{{ note }}</p>{%- endif -%}
   <button type="button" class="bf-btn" data-bf-add-both>Add Both Products</button>
   <p class="bf-msg" data-bf-msg role="status" aria-live="polite"></p>
 </bf-bogo>

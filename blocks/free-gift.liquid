@@ -1,0 +1,27 @@
+{%- comment -%}
+  Free gift callout for the product page. Renders only when the product has the
+  custom.free_gift_product metafield. Informational: configure the real gift as a Shopify discount.
+{%- endcomment -%}
+
+{% render 'bf-free-gift', product: closest.product, message: block.settings.message %}
+
+{% schema %}
+{
+  "name": "Free gift",
+  "tag": null,
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "Shows the product set in this product's 'Free gift product' metafield. Hidden when the metafield is empty. Informational only: set up the actual free gift as a Shopify discount."
+    },
+    {
+      "type": "text",
+      "id": "message",
+      "label": "Message",
+      "default": "Buy this product and receive [gift] FREE when the campaign starts.",
+      "info": "[gift] is replaced with the gift product's title."
+    }
+  ],
+  "presets": [{ "name": "Free gift" }]
+}
+{% endschema %}

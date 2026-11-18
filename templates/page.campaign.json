@@ -1,0 +1,178 @@
+{
+  "sections": {
+    "hero": {
+      "type": "bf-campaign-hero",
+      "settings": {
+        "heading": "Big Sale",
+        "announcement": "Deals go live soon",
+        "description": "Sign up to be notified when deals go live.",
+        "show_signup": true
+      }
+    },
+    "tabs": {
+      "type": "bf-tabs",
+      "blocks": {
+        "t1": {
+          "type": "tab",
+          "settings": {
+            "label": "Featured deals",
+            "anchor": "deals"
+          }
+        },
+        "t2": {
+          "type": "tab",
+          "settings": {
+            "label": "Bestsellers",
+            "anchor": "bestsellers"
+          }
+        },
+        "t3": {
+          "type": "tab",
+          "settings": {
+            "label": "Buy one, get one",
+            "anchor": "bogo"
+          }
+        }
+      },
+      "block_order": [
+        "t1",
+        "t2",
+        "t3"
+      ],
+      "settings": {}
+    },
+    "deals": {
+      "type": "bf-product-list",
+      "blocks": {
+        "p1": {
+          "type": "product",
+          "settings": {
+            "discount_type": "percentage",
+            "visible": true
+          }
+        },
+        "p2": {
+          "type": "product",
+          "settings": {
+            "discount_type": "percentage",
+            "visible": true
+          }
+        },
+        "p3": {
+          "type": "product",
+          "settings": {
+            "discount_type": "percentage",
+            "visible": true
+          }
+        }
+      },
+      "block_order": [
+        "p1",
+        "p2",
+        "p3"
+      ],
+      "settings": {
+        "heading": "Featured deals",
+        "anchor": "deals",
+        "display": "grid",
+        "featured_first": true
+      }
+    },
+    "bestsellers": {
+      "type": "bf-product-list",
+      "blocks": {
+        "p1": {
+          "type": "product",
+          "settings": {
+            "discount_type": "percentage",
+            "visible": true
+          }
+        },
+        "p2": {
+          "type": "product",
+          "settings": {
+            "discount_type": "percentage",
+            "visible": true
+          }
+        },
+        "p3": {
+          "type": "product",
+          "settings": {
+            "discount_type": "percentage",
+            "visible": true
+          }
+        }
+      },
+      "block_order": [
+        "p1",
+        "p2",
+        "p3"
+      ],
+      "settings": {
+        "heading": "Bestsellers",
+        "anchor": "bestsellers",
+        "display": "carousel",
+        "bg_from": "#6b2a1c",
+        "bg_to": "#4a1f2e"
+      }
+    },
+    "bogo": {
+      "type": "bf-bogo-offers",
+      "settings": {
+        "heading": "Buy one, get one",
+        "anchor": "bogo",
+        "offer_limit": 6
+      }
+    },
+    "trust": {
+      "type": "bf-trust",
+      "blocks": {
+        "t1": {
+          "type": "trust",
+          "settings": {
+            "title": "Fast shipping",
+            "text": "Reliable delivery on all in-stock orders."
+          }
+        },
+        "t2": {
+          "type": "trust",
+          "settings": {
+            "title": "Price match",
+            "text": "Contact support to claim a price difference."
+          }
+        },
+        "t3": {
+          "type": "trust",
+          "settings": {
+            "title": "Easy returns",
+            "text": "Extended holiday return window."
+          }
+        },
+        "t4": {
+          "type": "trust",
+          "settings": {
+            "title": "Warranty",
+            "text": "Hassle-free replacement on eligible items."
+          }
+        }
+      },
+      "block_order": [
+        "t1",
+        "t2",
+        "t3",
+        "t4"
+      ],
+      "settings": {
+        "heading": "Why shop with us?"
+      }
+    }
+  },
+  "order": [
+    "hero",
+    "tabs",
+    "deals",
+    "bestsellers",
+    "bogo",
+    "trust"
+  ]
+}

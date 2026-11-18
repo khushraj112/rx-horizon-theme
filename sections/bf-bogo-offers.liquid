@@ -23,13 +23,13 @@
             and offer.qualifying_product.value != blank
             and offer.reward_products.value.size > 0
           -%}
-            {% render 'bf-bogo-card', offer: offer %}
+            {% render 'bf-bogo-card', offer: offer, note: section.settings.prelaunch_message %}
             {%- assign shown = shown | plus: 1 -%}
           {%- endif -%}
         {%- endfor -%}
       </div>
       {%- if shown == 0 -%}
-        <p class="bf-sec__empty">No active BOGO offers right now.</p>
+        <p class="bf-sec__empty">{{ section.settings.empty_message }}</p>
       {%- endif -%}
     </div>
   </div>
@@ -41,10 +41,12 @@
   "name": "BOGO offers",
   "settings": [
     { "type": "checkbox", "id": "enabled", "label": "Show section", "default": true },
-    { "type": "text", "id": "heading", "label": "Heading", "default": "BOGO Drops" },
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Buy one, get one" },
     { "type": "textarea", "id": "description", "label": "Description" },
     { "type": "text", "id": "anchor", "label": "Anchor ID", "info": "Used by the Campaign tabs, e.g. bf-bogo." },
     { "type": "range", "id": "offer_limit", "label": "Max offers", "min": 1, "max": 12, "default": 6 },
+    { "type": "text", "id": "prelaunch_message", "label": "Pre-launch message", "default": "Offer applicable when the campaign starts.", "info": "Shown on every offer. The real discount comes from your Shopify Buy X Get Y discount, which is NOT synced with the BOGO Offer entries." },
+    { "type": "text", "id": "empty_message", "label": "Message when there are no offers", "default": "No active offers right now." },
     { "type": "color", "id": "bg_from", "label": "Background gradient: top", "default": "#4a1f2e" },
     { "type": "color", "id": "bg_to", "label": "Background gradient: bottom", "default": "#2a1220" }
   ],

@@ -242,6 +242,10 @@
                 "padding-inline-end": 0
               },
               "blocks": {}
+            },
+            "free_gift_bf": {
+              "type": "free-gift",
+              "settings": {}
             }
           },
           "block_order": [
@@ -249,6 +253,7 @@
             "divider_VJhene",
             "variant_picker_R3rGDr",
             "buy_buttons_eYQEYi",
+            "free_gift_bf",
             "text_aEtTtq"
           ]
         }

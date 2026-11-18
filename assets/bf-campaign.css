@@ -75,7 +75,7 @@
 .bf-carousel { position: relative; display: block; }
 .bf-track { display: flex; gap: 24px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; padding-bottom: 4px; }
 .bf-track::-webkit-scrollbar { display: none; }
-.bf-track > .bf-card { flex: 0 0 min(300px, 80%); scroll-snap-align: start; }
+.bf-track .bf-card { flex: 0 0 min(300px, 80%); scroll-snap-align: start; }
 .bf-carousel__nav { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 .bf-arrow { width: 40px; height: 40px; border-radius: 50%; border: 1px solid rgb(255 255 255 / .6); background: transparent; color: #fff; cursor: pointer; font-size: 18px; }
 
@@ -106,3 +106,11 @@
   .bf-tabs a { font-size: 13px; padding: 14px 4px; }
   .bf-countdown__unit { min-width: 56px; }
 }
+
+/* Campaign price preview (display only) */
+.bf-announce { margin: 0 0 8px !important; font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--bf-gold); }
+.bf-price__tag { margin: 0; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--bf-orange); }
+.bf-price__tag[hidden], .bf-card__campaign[hidden] { display: none; }
+.bf-card__campaign { margin: 0; font-size: 12px; font-style: italic; color: #6b6b6b; }
+.bf-card--featured .bf-price__tag, .bf-card--featured .bf-card__campaign { color: var(--bf-gold); }
+.bf-cell { display: contents; }

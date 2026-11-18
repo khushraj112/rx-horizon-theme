@@ -1,0 +1,56 @@
+{%- doc -%}
+  Display-only campaign price preview for ONE variant. Outputs a single "~~"-delimited string:
+    mode~~price~~compare~~badge
+  mode    campaign = configured campaign discount applied to the preview
+          native   = no valid campaign discount, fall back to Shopify compare-at pricing
+          none     = plain Shopify price
+  price   price to show as the big number (formatted money)
+  compare original Shopify price, shown struck through (formatted money, may be empty)
+  badge   "30% off" / "$10.00 off" (may be empty)
+
+  All maths uses integer minor units (cents). This NEVER changes a real price, and the preview price is
+  never sent to the cart: cart operations use the variant id only, so Shopify charges its real price and
+  its native automatic discounts apply at cart/checkout once active.
+
+  Invalid configs (value <= 0, percentage >= 100, fixed amount >= price) are ignored and fall back.
+
+  @param {variant} variant - The variant to preview
+  @param {string} [dtype] - 'percentage' or 'fixed'
+  @param {number} [dval] - Discount value (percent, or amount in store currency)
+{%- enddoc -%}
+
+{%- liquid
+  assign price = variant.price
+  assign off = 0
+  assign val = dval | default: 0 | times: 1.0
+
+  if dtype == 'percentage' and val > 0 and val < 100
+    assign off = price | times: val | divided_by: 100.0 | round
+  elsif dtype == 'fixed' and val > 0
+    assign off = val | times: 100 | round
+  endif
+
+  assign promo = price | minus: off
+  assign price_fmt = price | money
+  if off > 0 and promo > 0
+    assign promo_fmt = promo | money
+    if dtype == 'percentage'
+      assign val_int = val | round
+      if val_int == val
+        assign badge = val_int | append: '% off'
+      else
+        assign badge = val | append: '% off'
+      endif
+    else
+      assign off_fmt = off | money
+      assign badge = off_fmt | append: ' off'
+    endif
+    echo 'campaign~~' | append: promo_fmt | append: '~~' | append: price_fmt | append: '~~' | append: badge
+  elsif variant.compare_at_price > price
+    assign pct = variant.compare_at_price | minus: price | times: 100.0 | divided_by: variant.compare_at_price | round
+    assign cmp_fmt = variant.compare_at_price | money
+    echo 'native~~' | append: price_fmt | append: '~~' | append: cmp_fmt | append: '~~' | append: pct | append: '% off'
+  else
+    echo 'none~~' | append: price_fmt | append: '~~~~'
+  endif
+-%}

@@ -10,6 +10,9 @@
       {{ section.settings.image | image_url: width: 2000 | image_tag: class: 'bf-hero__bg', loading: 'eager', alt: '', widths: '800, 1200, 1600, 2000', sizes: '100vw' }}
     {%- endif -%}
     <div class="bf-sec__in">
+      {%- if section.settings.announcement != blank -%}
+        <p class="bf-announce">{{ section.settings.announcement }}</p>
+      {%- endif -%}
       <h1>{{ section.settings.heading }}</h1>
       {%- if section.settings.description != blank -%}<p>{{ section.settings.description }}</p>{%- endif -%}
 
@@ -29,6 +32,7 @@
       {%- if section.settings.show_signup -%}
         <bf-signup
           class="bf-signup"
+          data-source="{{ section.settings.heading | escape }}"
           data-company-id="{{ section.settings.klaviyo_company_id | escape }}"
           data-list-id="{{ section.settings.klaviyo_list_id | escape }}"
         >
@@ -51,7 +55,8 @@
   "name": "Campaign hero",
   "settings": [
     { "type": "checkbox", "id": "enabled", "label": "Show section", "default": true },
-    { "type": "text", "id": "heading", "label": "Heading", "default": "Black Friday" },
+    { "type": "text", "id": "announcement", "label": "Campaign announcement", "info": "Short line above the heading, e.g. dates or 'Deals go live soon'." },
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Big Sale" },
     { "type": "textarea", "id": "description", "label": "Description", "default": "Our biggest deals of the year. Sign up to be notified when they go live." },
     { "type": "image_picker", "id": "image", "label": "Background image" },
     { "type": "color", "id": "bg_from", "label": "Background gradient: top", "default": "#000000" },

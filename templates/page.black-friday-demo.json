@@ -11,39 +11,155 @@
     "tabs": {
       "type": "bf-tabs",
       "blocks": {
-        "t1": { "type": "tab", "settings": { "label": "Flagship deals", "anchor": "bf-flagship" } },
-        "t2": { "type": "tab", "settings": { "label": "Bestsellers", "anchor": "bf-best" } },
-        "t3": { "type": "tab", "settings": { "label": "BOGO drops", "anchor": "bf-bogo" } }
+        "t1": {
+          "type": "tab",
+          "settings": {
+            "label": "Flagship deals",
+            "anchor": "bf-flagship"
+          }
+        },
+        "t2": {
+          "type": "tab",
+          "settings": {
+            "label": "Bestsellers",
+            "anchor": "bf-best"
+          }
+        },
+        "t3": {
+          "type": "tab",
+          "settings": {
+            "label": "BOGO drops",
+            "anchor": "bf-bogo"
+          }
+        }
       },
-      "block_order": ["t1", "t2", "t3"],
+      "block_order": [
+        "t1",
+        "t2",
+        "t3"
+      ],
       "settings": {}
     },
     "flagship": {
-      "type": "bf-collection-products",
+      "type": "bf-product-list",
       "settings": {
-        "collection": "all",
         "heading": "Flagship Deals",
         "description": "Our biggest Black Friday savings.",
         "anchor": "bf-flagship",
-        "limit": 6,
         "display": "grid",
         "featured_first": true,
         "bg_from": "#5a2a10",
         "bg_to": "#6b2a1c"
-      }
+      },
+      "blocks": {
+        "p1": {
+          "type": "product",
+          "settings": {
+            "product": "bf-925-sterling-silver-laser-cut-nose-ring",
+            "discount_type": "percentage",
+            "visible": true,
+            "discount_value": 30,
+            "promo_label": "Limited drop"
+          }
+        },
+        "p2": {
+          "type": "product",
+          "settings": {
+            "product": "bf-925-sterling-silver-double-row-segment-clicker-ring",
+            "discount_type": "fixed",
+            "visible": true,
+            "discount_value": 2
+          }
+        },
+        "p3": {
+          "type": "product",
+          "settings": {
+            "product": "bf-tea-tree-salt-spray-piercing-aftercare-solution",
+            "discount_type": "percentage",
+            "visible": true,
+            "discount_value": 0
+          }
+        },
+        "p4": {
+          "type": "product",
+          "settings": {
+            "product": "bf-surgical-steel-hinged-sleeper-earrings-hoops",
+            "discount_type": "percentage",
+            "visible": true
+          }
+        },
+        "p5": {
+          "type": "product",
+          "settings": {
+            "product": "bf-monster-piercings-jewellery-cleaning-and-care-set",
+            "discount_type": "fixed",
+            "visible": true,
+            "discount_value": 20
+          }
+        },
+        "p6": {
+          "type": "product",
+          "settings": {
+            "product": "bf-925-sterling-silver-rhodium-plated-princess-cut-cz-halo-stud-earrings",
+            "discount_type": "percentage",
+            "visible": true,
+            "discount_value": 100
+          }
+        }
+      },
+      "block_order": [
+        "p1",
+        "p2",
+        "p3",
+        "p4",
+        "p5",
+        "p6"
+      ]
     },
     "bestsellers": {
-      "type": "bf-collection-products",
+      "type": "bf-product-list",
       "settings": {
-        "collection": "all",
         "heading": "Bestsellers",
         "anchor": "bf-best",
-        "limit": 8,
         "display": "carousel",
         "featured_first": false,
         "bg_from": "#6b2a1c",
         "bg_to": "#4a1f2e"
-      }
+      },
+      "blocks": {
+        "p1": {
+          "type": "product",
+          "settings": {
+            "product": "bf-9k-gold-claw-set-round-cz-nose-screw-stud",
+            "discount_type": "percentage",
+            "visible": true,
+            "discount_value": 25
+          }
+        },
+        "p2": {
+          "type": "product",
+          "settings": {
+            "product": "bf-14ct-gold-ball-end-nose-pin",
+            "discount_type": "fixed",
+            "visible": true,
+            "discount_value": 5
+          }
+        },
+        "p3": {
+          "type": "product",
+          "settings": {
+            "product": "bf-triple-star-clear-gem-top-surgical-steel-ear-stud",
+            "discount_type": "percentage",
+            "visible": true,
+            "discount_value": 15.5
+          }
+        }
+      },
+      "block_order": [
+        "p1",
+        "p2",
+        "p3"
+      ]
     },
     "bogo": {
       "type": "bf-bogo-offers",
@@ -56,14 +172,52 @@
     "trust": {
       "type": "bf-trust",
       "blocks": {
-        "t1": { "type": "trust", "settings": { "title": "Fast shipping", "text": "Reliable delivery on all in-stock orders." } },
-        "t2": { "type": "trust", "settings": { "title": "Price match", "text": "Contact support to claim a price difference." } },
-        "t3": { "type": "trust", "settings": { "title": "Easy returns", "text": "Extended holiday return window." } },
-        "t4": { "type": "trust", "settings": { "title": "Warranty", "text": "Hassle-free replacement on eligible items." } }
+        "t1": {
+          "type": "trust",
+          "settings": {
+            "title": "Fast shipping",
+            "text": "Reliable delivery on all in-stock orders."
+          }
+        },
+        "t2": {
+          "type": "trust",
+          "settings": {
+            "title": "Price match",
+            "text": "Contact support to claim a price difference."
+          }
+        },
+        "t3": {
+          "type": "trust",
+          "settings": {
+            "title": "Easy returns",
+            "text": "Extended holiday return window."
+          }
+        },
+        "t4": {
+          "type": "trust",
+          "settings": {
+            "title": "Warranty",
+            "text": "Hassle-free replacement on eligible items."
+          }
+        }
       },
-      "block_order": ["t1", "t2", "t3", "t4"],
-      "settings": { "heading": "Why shop with us?" }
+      "block_order": [
+        "t1",
+        "t2",
+        "t3",
+        "t4"
+      ],
+      "settings": {
+        "heading": "Why shop with us?"
+      }
     }
   },
-  "order": ["hero", "tabs", "flagship", "bestsellers", "bogo", "trust"]
+  "order": [
+    "hero",
+    "tabs",
+    "flagship",
+    "bestsellers",
+    "bogo",
+    "trust"
+  ]
 }

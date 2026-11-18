@@ -15,8 +15,19 @@
       {%- endif -%}
       {%- if section.settings.product != blank -%}
         <div class="bf-grid">
-          {% render 'bf-product-card', product: section.settings.product, featured: true %}
+          {% render 'bf-product-card',
+            product: section.settings.product,
+            featured: true,
+            dtype: section.settings.discount_type,
+            dval: section.settings.discount_value,
+            label: section.settings.promo_label,
+            tag: section.settings.price_tag,
+            note: section.settings.campaign_message
+          %}
         </div>
+        {%- if section.settings.show_gift -%}
+          {% render 'bf-free-gift', product: section.settings.product, message: section.settings.gift_message %}
+        {%- endif -%}
       {%- else -%}
         <p class="bf-sec__empty">Pick a product in the Theme Editor.</p>
       {%- endif -%}
@@ -31,8 +42,24 @@
   "settings": [
     { "type": "checkbox", "id": "enabled", "label": "Show section", "default": true },
     { "type": "product", "id": "product", "label": "Product" },
-    { "type": "text", "id": "heading", "label": "Heading", "default": "Deal of the Day" },
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Featured deal" },
     { "type": "text", "id": "promo_message", "label": "Promo message" },
+    {
+      "type": "select",
+      "id": "discount_type",
+      "label": "Discount type",
+      "options": [
+        { "value": "percentage", "label": "Percentage" },
+        { "value": "fixed", "label": "Fixed amount" }
+      ],
+      "default": "percentage"
+    },
+    { "type": "number", "id": "discount_value", "label": "Discount value", "info": "Percentage or amount in store currency. Leave blank for normal Shopify pricing." },
+    { "type": "text", "id": "promo_label", "label": "Promotional label (optional)" },
+    { "type": "text", "id": "price_tag", "label": "Price tag", "default": "Campaign price" },
+    { "type": "text", "id": "campaign_message", "label": "Campaign message", "default": "Campaign price applicable when the sale starts." },
+    { "type": "checkbox", "id": "show_gift", "label": "Show free gift (if the product has one)", "default": false },
+    { "type": "text", "id": "gift_message", "label": "Free gift message", "default": "Buy this product and receive [gift] FREE when the campaign starts." },
     { "type": "text", "id": "anchor", "label": "Anchor ID" },
     { "type": "color", "id": "bg_from", "label": "Background gradient: top", "default": "#5a2a10" },
     { "type": "color", "id": "bg_to", "label": "Background gradient: bottom", "default": "#6b2a1c" }

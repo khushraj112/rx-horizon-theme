@@ -1,25 +1,27 @@
 {%- doc -%}
   Reusable campaign product card.
-  Pricing is 100% native: price = current price, compare_at_price = original (strikethrough).
-  The "% off" badge is computed from those two values per variant. Automatic discounts are never
-  calculated here (they are applied by Shopify in cart/checkout). The optional custom.promotion_label
-  metafield is display-only text and is never used for any calculation.
+
+  Display only. The Shopify price/compare-at price is the real price. An optional per-product campaign
+  discount (type + value, set on the Theme Editor block) produces a PREVIEW price via bf-campaign-price.
+  The preview is never sent to the cart: "Add to Cart" posts the variant id only, so Shopify charges its
+  real price and native automatic discounts apply once they are active.
 
   @param {product} product - The product to render
   @param {boolean} [featured] - Render as the large featured card
-  @param {boolean} [show_promo] - Show the promotion label (default true)
+  @param {string} [dtype] - Campaign discount type: 'percentage' or 'fixed'
+  @param {number} [dval] - Campaign discount value
+  @param {string} [label] - Optional promotional label
+  @param {string} [tag] - Small tag shown above a campaign preview price
+  @param {string} [note] - Editable message shown under a campaign preview price
 {%- enddoc -%}
 
 {%- liquid
   assign first_variant = product.selected_or_first_available_variant
-  assign promo = product.metafields.custom.promotion_label.value
-  if show_promo == false
-    assign promo = blank
-  endif
-  assign pct = 0
-  if first_variant.compare_at_price > first_variant.price
-    assign pct = first_variant.compare_at_price | minus: first_variant.price | times: 100.0 | divided_by: first_variant.compare_at_price | round
-  endif
+  capture c0
+    render 'bf-campaign-price', variant: first_variant, dtype: dtype, dval: dval
+  endcapture
+  assign p0 = c0 | split: '~~'
+  assign mode0 = p0[0]
 -%}
 
 <bf-card class="bf-card{% if featured %} bf-card--featured{% endif %}" data-product-id="{{ product.id }}" data-product-handle="{{ product.handle }}">
@@ -27,29 +29,30 @@
     {%- if product.featured_image -%}
       {{ product.featured_image | image_url: width: 600 | image_tag: loading: 'lazy', widths: '300, 450, 600', sizes: '(min-width: 750px) 25vw, 50vw', alt: product.title }}
     {%- endif -%}
-    <span class="bf-badge" data-bf-badge {% if pct == 0 %}hidden{% endif %}>{{ pct }}% off</span>
+    <span class="bf-badge" data-bf-badge {% if p0[3] == blank %}hidden{% endif %}>{{ p0[3] }}</span>
   </a>
   <h3 class="bf-card__title"><a href="{{ product.url }}">{{ product.title }}</a></h3>
 
+  <p class="bf-price__tag" data-bf-tag {% if mode0 != 'campaign' or tag == blank %}hidden{% endif %}>{{ tag }}</p>
   <div class="bf-card__price" data-bf-price>
-    <s class="bf-price__compare" data-bf-compare {% if pct == 0 %}hidden{% endif %}>{% if pct > 0 %}{{ first_variant.compare_at_price | money }}{% endif %}</s>
-    <span class="bf-price__current" data-bf-current>{{ first_variant.price | money }}</span>
+    <s class="bf-price__compare" data-bf-compare {% if p0[2] == blank %}hidden{% endif %}>{{ p0[2] }}</s>
+    <span class="bf-price__current" data-bf-current>{{ p0[1] }}</span>
   </div>
+  <p class="bf-card__campaign" data-bf-note {% if mode0 != 'campaign' or note == blank %}hidden{% endif %}>{{ note }}</p>
 
-  <p class="bf-card__promo" data-bf-promo {% if promo == blank %}hidden{% endif %}>{{ promo }}</p>
+  <p class="bf-card__promo" data-bf-promo {% if label == blank %}hidden{% endif %}>{{ label }}</p>
 
   {%- if product.variants.size > 1 -%}
     <select class="bf-select" data-bf-variant aria-label="{{ product.title | escape }} variant">
       {%- for variant in product.variants -%}
-        {%- assign v_pct = 0 -%}
-        {%- if variant.compare_at_price > variant.price -%}
-          {%- assign v_pct = variant.compare_at_price | minus: variant.price | times: 100.0 | divided_by: variant.compare_at_price | round -%}
-        {%- endif -%}
+        {%- capture cv -%}{% render 'bf-campaign-price', variant: variant, dtype: dtype, dval: dval %}{%- endcapture -%}
+        {%- assign pv = cv | split: '~~' -%}
         <option
           value="{{ variant.id }}"
-          data-price="{{ variant.price | money }}"
-          data-compare="{% if v_pct > 0 %}{{ variant.compare_at_price | money }}{% endif %}"
-          data-pct="{{ v_pct }}"
+          data-mode="{{ pv[0] }}"
+          data-price="{{ pv[1] }}"
+          data-compare="{{ pv[2] }}"
+          data-badge="{{ pv[3] }}"
           {% unless variant.available %}disabled{% endunless %}
           {% if variant.id == first_variant.id %}selected{% endif %}
         >
