@@ -53,8 +53,11 @@
     {%- endfor -%}
   </select>
 
-  <button type="button" class="bf-btn" data-bf-add {% unless product.available %}disabled{% endunless %}>
-    {%- if product.available -%}Add to Cart{%- else -%}Sold out{%- endif -%}
-  </button>
+  <div class="bf-actions">
+    <button type="button" class="bf-btn" data-bf-add {% unless product.available %}disabled{% endunless %}>
+      {%- if product.available -%}Add to Cart{%- else -%}Sold out{%- endif -%}
+    </button>
+    <a class="bf-btn bf-btn--ghost" href="{{ product.url }}">View product</a>
+  </div>
   <p class="bf-msg" data-bf-msg role="status" aria-live="polite"></p>
 </bf-card>

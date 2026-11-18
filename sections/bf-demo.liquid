@@ -31,6 +31,12 @@
     </bf-signup>
   </header>
 
+  <nav class="bf-tabs" aria-label="Black Friday sections">
+    <a href="#bf-flagship">Flagship deals</a>
+    <a href="#bf-best">Bestsellers</a>
+    <a href="#bf-bogo">BOGO drops</a>
+  </nav>
+
   <section class="bf-block" aria-labelledby="bf-flagship">
     <h2 id="bf-flagship">Flagship Deals</h2>
     <p class="bf-sub">Products carrying a sale percentage metafield.</p>
@@ -103,31 +109,63 @@
 <script src="{{ 'bf-demo.js' | asset_url }}" type="module" async></script>
 
 {% stylesheet %}
-  .bf-demo { max-width: 1200px; margin: 0 auto; padding: 24px 16px 64px; }
-  .bf-hero { text-align: center; padding: 32px 0; }
-  .bf-signup form { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 16px; }
-  .bf-signup input { min-width: 240px; padding: 10px; border: 1px solid currentColor; }
-  .bf-consent { flex-basis: 100%; font-size: 12px; opacity: .8; }
-  .bf-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; }
+  .bf-demo { --bf-orange: #ff5f00; --bf-gold: #ffd37a; position: relative; color: #fff; padding: 0 16px 72px;
+    background: linear-gradient(180deg, #000 0, #000 360px, #5a2a10 560px, #6b2a1c 55%, #4a1f2e 80%, #1a0a10 100%);
+    box-shadow: 0 0 0 100vmax #1a0a10; clip-path: inset(0 -100vmax); }
+  .bf-demo > * { max-width: 1200px; margin-inline: auto; }
+  .bf-hero { text-align: left; padding: 64px 0 72px; max-width: 1200px; }
+  .bf-hero h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; color: var(--bf-orange); margin: 0 0 12px; font-weight: 800; }
+  .bf-hero p { color: #fff; margin: 0; max-width: 520px; }
+  .bf-signup form { display: flex; flex-wrap: wrap; gap: 0; max-width: 520px; margin-top: 20px; }
+  .bf-signup input { flex: 1 1 220px; min-width: 0; padding: 14px 16px; border: 0; border-radius: 4px 0 0 4px; background: #fff; color: #2f2f2f; font-size: 14px; }
+  .bf-signup .bf-btn { border-radius: 0 4px 4px 0; }
+  .bf-consent { flex-basis: 100%; font-size: 12px; opacity: .85; margin: 10px 0 0; }
+  .bf-tabs { position: sticky; top: 0; z-index: 5; display: flex; max-width: none !important; margin: 0 -16px; background: rgb(60 25 10 / .92); backdrop-filter: blur(6px); }
+  .bf-tabs a { flex: 1; text-align: center; padding: 16px 8px; color: #fff; text-decoration: none; font-weight: 500; border-bottom: 2px solid transparent; }
+  .bf-tabs a:hover, .bf-tabs a:focus-visible { border-bottom-color: #fff; }
+  .bf-block { margin-top: 56px; scroll-margin-top: 72px; }
+  .bf-block h2 { text-align: center; color: var(--bf-gold); font-size: clamp(26px, 4vw, 40px); margin: 0 0 8px; font-weight: 700; }
+  .bf-sub { text-align: center; color: var(--bf-gold); margin: 0 0 32px; }
+  .bf-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 24px; }
   .bf-grid--bogo { grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); }
-  .bf-block { margin-top: 40px; }
-  .bf-card, .bf-bogo { display: flex; flex-direction: column; gap: 8px; border: 1px solid rgb(0 0 0 / .15); padding: 12px; }
-  .bf-card__media { position: relative; display: block; }
-  .bf-card__media img, .bf-bogo img { width: 100%; height: auto; display: block; }
-  .bf-badge { position: absolute; top: 8px; left: 8px; background: #000; color: #fff; padding: 2px 8px; font-size: 12px; }
-  .bf-badge--static { position: static; align-self: flex-start; }
-  .bf-card__title, .bf-bogo h4 { font-size: 15px; margin: 0; }
-  .bf-price__compare { opacity: .6; margin-right: 6px; }
-  .bf-note { font-size: 12px; opacity: .75; }
-  .bf-select { padding: 8px; width: 100%; }
-  .bf-btn { padding: 10px 16px; background: #000; color: #fff; border: 0; cursor: pointer; }
+  .bf-card, .bf-bogo { position: relative; display: flex; flex-direction: column; gap: 10px; background: #fff; color: #2f2f2f; border-radius: 8px; padding: 20px 16px 16px; overflow: hidden; }
+  .bf-card__media { display: block; padding-top: 12px; }
+  .bf-card__media img, .bf-bogo img { width: 100%; height: auto; aspect-ratio: 1; object-fit: contain; display: block; }
+  .bf-badge { position: absolute; top: 0; left: 0; background: linear-gradient(90deg, #ff9a3c, var(--bf-orange)); color: #fff; padding: 8px 28px 8px 14px; font-size: 16px; font-weight: 800; text-transform: uppercase; clip-path: polygon(0 0, 100% 0, 88% 100%, 0 100%); }
+  .bf-badge--static { position: static; align-self: flex-start; margin: 0; }
+  .bf-card__title, .bf-bogo h4, .bf-bogo h3 { font-size: 17px; margin: 0; font-weight: 600; }
+  .bf-card__title a, .bf-bogo h4 a { color: inherit; text-decoration: none; }
+  .bf-card__price { font-size: 20px; font-weight: 700; }
+  .bf-price__current { color: var(--bf-orange); }
+  .bf-price__compare { color: #000; margin-left: 8px; font-weight: 600; order: 2; }
+  .bf-card__price { display: flex; align-items: baseline; }
+  .bf-card__pct { margin: 0; font-size: 13px; color: var(--bf-orange); font-weight: 600; }
+  .bf-note { font-size: 12px; color: #6b6b6b; }
+  .bf-card__pct .bf-note { color: #6b6b6b; font-weight: 400; }
+  .bf-select { padding: 10px; width: 100%; border: 1px solid #ddd; border-radius: 6px; background: #fff; color: #2f2f2f; }
+  .bf-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: auto; }
+  .bf-actions .bf-btn { padding: 12px 6px; font-size: 14px; white-space: nowrap; }
+  .bf-btn { padding: 12px 16px; background: var(--bf-orange); color: #fff; border: 1px solid var(--bf-orange); border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 15px; text-align: center; text-decoration: none; }
+  .bf-btn--ghost { background: #fff; color: var(--bf-orange); }
+  .bf-btn:hover { filter: brightness(1.08); }
   .bf-btn[disabled] { opacity: .5; cursor: not-allowed; }
   .bf-msg { font-size: 13px; min-height: 1em; margin: 0; }
-  .bf-msg[data-state='error'] { color: #b00020; }
+  .bf-hero .bf-msg { color: #fff; }
+  .bf-msg[data-state='error'] { color: #d4143a; }
   .bf-msg[data-state='ok'] { color: #0a6b2d; }
+  .bf-hero .bf-msg[data-state='error'] { color: #ff8a9b; }
+  .bf-hero .bf-msg[data-state='ok'] { color: #7be3a1; }
   .bf-bogo__pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .bf-bogo__item { display: flex; flex-direction: column; gap: 6px; }
-  .bf-role { font-size: 12px; text-transform: uppercase; opacity: .7; }
+  .bf-role { font-size: 12px; text-transform: uppercase; color: #6b6b6b; font-weight: 600; }
+  .bf-bogo__item[data-role='reward'] .bf-role { color: var(--bf-orange); }
+  @media (max-width: 749px) {
+    .bf-hero { padding: 40px 0 48px; }
+    .bf-grid, .bf-grid--bogo { grid-template-columns: 1fr; }
+    .bf-signup input { border-radius: 4px; flex-basis: 100%; }
+    .bf-signup .bf-btn { border-radius: 4px; margin-top: 8px; width: 100%; }
+    .bf-tabs a { font-size: 13px; padding: 14px 4px; }
+  }
 {% endstylesheet %}
 
 {% schema %}
