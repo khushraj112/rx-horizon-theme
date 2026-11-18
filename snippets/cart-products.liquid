@@ -257,7 +257,9 @@
                           role="list"
                         >
                           {%- for discount in item.line_level_discount_allocations -%}
-                            <li>{{ discount.discount_application.title | escape }}</li>
+                            {%- if discount.amount > 0 -%}
+                              <li>{{ discount.discount_application.title | escape }} (-{{ discount.amount | money }})</li>
+                            {%- endif -%}
                           {%- endfor -%}
                         </ul>
                       {%- endif -%}
@@ -367,6 +369,9 @@
                   role="cell"
                   headers="productTotal"
                 >
+                  {%- if item.original_line_price > item.final_line_price -%}
+                    <s class="cart-items__price-original">{{ item.original_line_price | money }}</s>
+                  {%- endif -%}
                   <text-component value="{{ price | strip_html }}">{{ price }}</text-component>
                   {%- if item.unit_price_measurement -%}
                     <div class="cart-items__price-unit cart-secondary-typography">
@@ -611,6 +616,12 @@
   .cart-items__media {
     grid-area: media;
     padding: 0;
+  }
+
+  .cart-items__price-original {
+    display: block;
+    opacity: 0.6;
+    font-size: 0.875em;
   }
 
   .cart-items__price {
